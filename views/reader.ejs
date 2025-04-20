@@ -4,10 +4,83 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= book.title %> - BookReader</title>
+  <title><%= book.title %> - MyLibrary</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/css/reader.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <style>
+    .reader-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    #pdf-viewer {
+      overflow: auto;
+      max-height: calc(100vh - 200px);
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+      border: 1px solid #ddd;
+      background-color: #f5f5f5;
+    }
+    
+    #pdf-canvas {
+      margin: 0 auto;
+      display: block;
+    }
+    
+    .pdf-controls {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      padding: 10px;
+      background-color: #f8f8f8;
+      border-radius: 5px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .page-navigation, .zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    #page-info {
+      min-width: 120px;
+      text-align: center;
+    }
+    
+    .btn-control {
+      padding: 5px 15px;
+      background-color: #fff;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+    }
+    
+    .btn-control:hover {
+      background-color: #f0f0f0;
+    }
+    
+    /* Loading spinner */
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border-left-color: #09f;
+      animation: spin 1s linear infinite;
+      margin: 50px auto;
+      display: none;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body class="reader-page">
   <header class="reader-header">
@@ -22,7 +95,7 @@
     <div class="pdf-controls">
       <div class="page-navigation">
         <button id="prev" class="btn btn-control">Previous</button>
-        <span id="page-info">Page <span id="page-num"></span> of <span id="page-count"></span></span>
+        <span id="page-info">Page <span id="page-num">0</span> of <span id="page-count">0</span></span>
         <button id="next" class="btn btn-control">Next</button>
       </div>
       <div class="zoom-controls">
@@ -33,6 +106,7 @@
     </div>
     
     <div id="pdf-viewer">
+      <div id="loading" class="spinner"></div>
       <canvas id="pdf-canvas"></canvas>
     </div>
   </main>
@@ -50,6 +124,7 @@
     let scale = 1.0;
     const canvas = document.getElementById('pdf-canvas');
     const ctx = canvas.getContext('2d');
+    const loading = document.getElementById('loading');
     
     // Button elements
     const prevButton = document.getElementById('prev');
@@ -60,15 +135,19 @@
     // Load the PDF
     const loadPDF = async () => {
       try {
+        loading.style.display = 'block'; // Show loading spinner
+        
         const loadingTask = pdfjsLib.getDocument('/pdf/<%= book._id %>');
         pdfDoc = await loadingTask.promise;
         
         document.getElementById('page-count').textContent = pdfDoc.numPages;
+        document.getElementById('page-num').textContent = pageNum;
         
         // Initial page render
         renderPage(pageNum);
       } catch (error) {
         console.error('Error loading PDF:', error);
+        loading.style.display = 'none';
         alert('Failed to load the PDF. Please try again later.');
       }
     };
@@ -76,14 +155,20 @@
     // Render the page
     const renderPage = (num) => {
       pageRendering = true;
+      loading.style.display = 'block'; // Show loading spinner
       
       // Update UI
       document.getElementById('page-num').textContent = num;
       
       // Get page
       pdfDoc.getPage(num).then((page) => {
-        // Calculate scale based on viewport
+        // Get the original viewport dimensions
+        const originalViewport = page.getViewport({ scale: 1.0 });
+        
+        // Apply scale to the viewport
         const viewport = page.getViewport({ scale });
+        
+        // Set canvas dimensions based on the scaled viewport
         canvas.height = viewport.height;
         canvas.width = viewport.width;
         
@@ -98,12 +183,17 @@
         // When render is complete
         renderTask.promise.then(() => {
           pageRendering = false;
+          loading.style.display = 'none'; // Hide loading spinner
           
           if (pageNumPending !== null) {
             renderPage(pageNumPending);
             pageNumPending = null;
           }
         });
+      }).catch(error => {
+        console.error('Error rendering page:', error);
+        pageRendering = false;
+        loading.style.display = 'none';
       });
     };
     
@@ -136,6 +226,9 @@
     
     // Zoom in
     const onZoomIn = () => {
+      if (scale >= 3.0) {
+        return; // Limit maximum zoom
+      }
       scale += 0.25;
       document.getElementById('zoom-level').textContent = `${Math.round(scale * 100)}%`;
       queueRenderPage(pageNum);
@@ -144,12 +237,25 @@
     // Zoom out
     const onZoomOut = () => {
       if (scale <= 0.5) {
-        return;
+        return; // Limit minimum zoom
       }
       scale -= 0.25;
       document.getElementById('zoom-level').textContent = `${Math.round(scale * 100)}%`;
       queueRenderPage(pageNum);
     };
+    
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        onNextPage();
+      } else if (e.key === 'ArrowLeft') {
+        onPrevPage();
+      } else if (e.key === '+' || e.key === '=') {
+        onZoomIn();
+      } else if (e.key === '-' || e.key === '_') {
+        onZoomOut();
+      }
+    });
     
     // Add event listeners
     prevButton.addEventListener('click', onPrevPage);

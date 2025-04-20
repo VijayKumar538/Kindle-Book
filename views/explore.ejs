@@ -1,0 +1,115 @@
+<!-- views/explore.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Explore Books - MyLibrary</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1><a href="/">MyLibrary</a></h1>
+      <nav>
+        <a href="/library">My Library</a>
+        <a href="/explore" class="active">Explore</a>
+        <a href="/my-requests">My Requests</a>
+        <a href="/access-requests">Access Requests</a>
+        <a href="/upload">Upload Book</a>
+        <a href="/logout">Logout</a>
+      </nav>
+    </div>
+  </header>
+  
+  <main class="container">
+    <h2>Explore Books</h2>
+    
+    <div class="book-grid">
+      <% if (books.length === 0) { %>
+        <div class="empty-state">
+          <p>No books available at the moment.</p>
+        </div>
+      <% } else { %>
+        <% books.forEach(book => { %>
+          <div class="book-card" data-id="<%= book._id %>">
+            <div class="book-cover">
+              <div class="book-icon">📚</div>
+            </div>
+            <div class="book-info">
+              <h3><%= book.title %></h3>
+              <p class="author">by <%= book.author %></p>
+              <p class="owner">Shared by: <%= book.uploadedBy ? book.uploadedBy.username : 'Unknown' %></p>
+              <p class="visibility">
+                <span class="visibility-badge visibility-<%= book.visibility %>">
+                  <%= book.visibility === 'public' ? 'Public' : (book.visibility === 'restricted' ? 'Restricted' : 'Private') %>
+                </span>
+              </p>
+              <div class="book-actions">
+                <% if (book.visibility === 'public') { %>
+                  <a href="/read/<%= book._id %>" class="btn btn-primary">Read</a>
+                <% } else if (book.visibility === 'restricted') { %>
+                  <% if (book.accessList && book.accessList.includes(currentUser)) { %>
+                    <a href="/read/<%= book._id %>" class="btn btn-primary">Read</a>
+                  <% } else { %>
+                    <% if (pendingBookIds.includes(book._id.toString())) { %>
+                      <button class="btn btn-secondary" disabled>Request Pending</button>
+                    <% } else { %>
+                      <button class="btn btn-primary request-access" data-book-id="<%= book._id %>">Request Access</button>
+                    <% } %>
+                  <% } %>
+                <% } else { %>
+                  <span class="btn btn-secondary disabled">Private</span>
+                <% } %>
+              </div>
+            </div>
+          </div>
+        <% }) %>
+      <% } %>
+    </div>
+  </main>
+  
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 MyLibrary. All rights reserved.</p>
+    </div>
+  </footer>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const requestButtons = document.querySelectorAll('.request-access');
+      
+      requestButtons.forEach(button => {
+        button.addEventListener('click', async (e) => {
+          const bookId = e.target.dataset.bookId;
+          
+          try {
+            const response = await fetch(`/request-access/${bookId}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+              // Update UI to show pending
+              e.target.textContent = 'Request Pending';
+              e.target.disabled = true;
+              e.target.classList.remove('btn-primary');
+              e.target.classList.add('btn-secondary');
+              alert('Access request sent successfully');
+            } else {
+              alert(data.message || 'Failed to send request');
+            }
+          } catch (err) {
+            console.error('Error:', err);
+            alert('An error occurred while sending the request');
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>

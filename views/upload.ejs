@@ -4,15 +4,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Upload Book - BookReader</title>
+  <title>Upload Book - MyLibrary</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <header>
     <div class="container">
-      <h1><a href="/">BookReader</a></h1>
+      <h1><a href="/">MyLibrary</a></h1>
       <nav>
         <a href="/library">My Library</a>
+        <a href="/explore">Explore</a>
+        <a href="/my-requests">My Requests</a>
+        <a href="/access-requests">Access Requests</a>
         <a href="/upload" class="active">Upload Book</a>
         <a href="/logout">Logout</a>
       </nav>
@@ -39,6 +42,20 @@
         <input type="text" id="author" name="author" required>
       </div>
       
+      <div class="form-group">
+        <label for="visibility">Visibility</label>
+        <select id="visibility" name="visibility" required>
+          <option value="private">Private (Only you can access)</option>
+          <option value="public">Public (Anyone can access)</option>
+          <option value="restricted">Restricted (Specific users with permission)</option>
+        </select>
+        <p class="form-help">
+          <span class="visibility-info private">Private: Only you can view and access this book.</span>
+          <span class="visibility-info public">Public: Any user can view and read this book.</span>
+          <span class="visibility-info restricted">Restricted: Only users you approve can access this book.</span>
+        </p>
+      </div>
+      
       <div class="form-group file-input">
         <label for="book">PDF File</label>
         <input type="file" id="book" name="book" accept="application/pdf" required>
@@ -51,8 +68,39 @@
   
   <footer>
     <div class="container">
-      <p>&copy; 2025 BookReader. All rights reserved.</p>
+      <p>&copy; 2025 MyLibrary. All rights reserved.</p>
     </div>
   </footer>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const visibilitySelect = document.getElementById('visibility');
+      const visibilityInfos = document.querySelectorAll('.visibility-info');
+      
+      // Hide all info texts initially
+      visibilityInfos.forEach(info => {
+        info.style.display = 'none';
+      });
+      
+      // Show the relevant info text based on selected option
+      const showRelevantInfo = () => {
+        const selectedValue = visibilitySelect.value;
+        
+        visibilityInfos.forEach(info => {
+          if (info.classList.contains(selectedValue)) {
+            info.style.display = 'block';
+          } else {
+            info.style.display = 'none';
+          }
+        });
+      };
+      
+      // Show initial info
+      showRelevantInfo();
+      
+      // Update when selection changes
+      visibilitySelect.addEventListener('change', showRelevantInfo);
+    });
+  </script>
 </body>
 </html>

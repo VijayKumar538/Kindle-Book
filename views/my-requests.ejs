@@ -1,0 +1,72 @@
+<!-- views/my-requests.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Requests - MyLibrary</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1><a href="/">MyLibrary</a></h1>
+      <nav>
+        <a href="/library">My Library</a>
+        <a href="/explore">Explore</a>
+        <a href="/my-requests" class="active">My Requests</a>
+        <a href="/access-requests">Access Requests</a>
+        <a href="/upload">Upload Book</a>
+        <a href="/logout">Logout</a>
+      </nav>
+    </div>
+  </header>
+  
+  <main class="container">
+    <h2>My Access Requests</h2>
+    
+    <% if (requests.length === 0) { %>
+      <div class="empty-state">
+        <p>You haven't sent any access requests yet. <a href="/explore">Explore books</a> to find something to read.</p>
+      </div>
+    <% } else { %>
+      <div class="requests-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Book</th>
+              <th>Owner</th>
+              <th>Request Date</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% requests.forEach(request => { %>
+              <tr>
+                <td><%= request.book ? request.book.title : 'Unknown Book' %></td>
+                <td><%= request.bookOwner ? request.bookOwner.username : 'Unknown User' %></td>
+                <td><%= new Date(request.requestDate).toLocaleDateString() %></td>
+                <td>
+                  <span class="status-badge status-<%= request.status %>">
+                    <%= request.status.charAt(0).toUpperCase() + request.status.slice(1) %>
+                  </span>
+                  
+                  <% if (request.status === 'approved') { %>
+                    <a href="/read/<%= request.book._id %>" class="btn btn-small btn-primary">Read</a>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+  
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 MyLibrary. All rights reserved.</p>
+    </div>
+  </footer>
+</body>
+</html>
