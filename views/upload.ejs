@@ -1,0 +1,58 @@
+<!-- views/upload.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload Book - BookReader</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1><a href="/">BookReader</a></h1>
+      <nav>
+        <a href="/library">My Library</a>
+        <a href="/upload" class="active">Upload Book</a>
+        <a href="/logout">Logout</a>
+      </nav>
+    </div>
+  </header>
+  
+  <main class="container form-container">
+    <h2>Upload New Book</h2>
+    
+    <% if (typeof error !== 'undefined') { %>
+      <div class="alert alert-error">
+        <%= error %>
+      </div>
+    <% } %>
+    
+    <form action="/upload" method="POST" enctype="multipart/form-data">
+      <div class="form-group">
+        <label for="title">Book Title</label>
+        <input type="text" id="title" name="title" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="author">Author</label>
+        <input type="text" id="author" name="author" required>
+      </div>
+      
+      <div class="form-group file-input">
+        <label for="book">PDF File</label>
+        <input type="file" id="book" name="book" accept="application/pdf" required>
+        <p class="file-help">Only PDF files are allowed (max 10MB)</p>
+      </div>
+      
+      <button type="submit" class="btn btn-primary">Upload Book</button>
+    </form>
+  </main>
+  
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 BookReader. All rights reserved.</p>
+    </div>
+  </footer>
+</body>
+</html>
