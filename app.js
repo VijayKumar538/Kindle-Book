@@ -9,7 +9,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Connect to MongoDB
-mongoose.connect('mongodb://localhost:27017/kindleClone', {
+mongoose.connect('mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qqrud.mongodb.net/MyLibrary?retryWrites=true&w=majority&appName=MyLibrary', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
