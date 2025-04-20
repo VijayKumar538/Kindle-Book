@@ -9,12 +9,14 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Connect to MongoDB
-mongoose.connect('mongodb+srv://vijayreddy4469:f1DZPpXDv7c7OnU3@kv-dairy-farms.wclswpu.mongodb.net/MyLibrary?retryWrites=true&w=majority&appName=kv-dairy-farms', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => console.log('Connected to MongoDB'))
-.catch(err => console.error('MongoDB connection error:', err));
+mongoose.connect('mongodb+srv://vijayreddy4469:f1DZPpXDv7c7OnU3@kv-dairy-farms.wclswpu.mongodb.net/MyLibrary?retryWrites=true&w=majority&appName=kv-dairy-farms', { 
+    useNewUrlParser: true, 
+    useUnifiedTopology: true 
+}).then(() => {
+    console.log('Connected to MongoDB');
+}).catch(err => {
+    console.error('MongoDB connection error:', err);
+});
 
 // Define schemas
 const userSchema = new mongoose.Schema({
