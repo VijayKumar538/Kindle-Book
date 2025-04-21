@@ -1,5 +1,5 @@
 {
-  "name": "KINDLE-BOOK",
+  "name": "Kindle-Book",
   "version": "1.0.0",
   "description": "A Kindle clone application",
   "main": "app.js",
