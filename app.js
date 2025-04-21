@@ -9,7 +9,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Connect to MongoDB
-mongoose.connect('mongodb+srv://vijayreddy4469:f1DZPpXDv7c7OnU3@kv-dairy-farms.wclswpu.mongodb.net/MyLibrary?retryWrites=true&w=majority&appName=kv-dairy-farms', { 
+mongoose.connect('mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qqrud.mongodb.net/MyLibrary?retryWrites=true&w=majority&appName=MyLibrary', { 
     useNewUrlParser: true, 
     useUnifiedTopology: true 
 }).then(() => {
@@ -76,7 +76,7 @@ app.use(session({
   secret: 'your-secret-key',
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({ mongoUrl: 'mongodb://localhost:27017/kindleClone' }),
+  store: MongoStore.create({ mongoUrl: 'mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qqrud.mongodb.net/MyLibrary?retryWrites=true&w=majority&appName=MyLibrary' }),
   cookie: { maxAge: 1000 * 60 * 60 * 24 } // 1 day
 }));
 
