@@ -36,7 +36,7 @@ app.use(session({
   secret: 'your-secret-key',
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({ mongoUrl: 'mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qqrud.mongodb.net/MyLibrary?retryWrites=true&w=majority&appName=MyLibrary' }),
+  store: MongoStore.create({ mongoUrl: 'mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qqrud.mongodb.net/MyLibrary1?retryWrites=true&w=majority&appName=MyLibrary' }),
   cookie: { maxAge: 1000 * 60 * 60 * 24 } // 1 day
 }));
 
@@ -61,7 +61,7 @@ const formUpload = multer({
 }).none(); // Expect no files, only fields
 
 // Connect to MongoDB
-mongoose.connect('mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qqrud.mongodb.net/MyLibrary?retryWrites=true&w=majority&appName=MyLibrary', { 
+mongoose.connect('mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qqrud.mongodb.net/MyLibrary1?retryWrites=true&w=majority&appName=MyLibrary', { 
   useNewUrlParser: true, 
   useUnifiedTopology: true 
 }).then(() => {
