@@ -1,4 +1,3 @@
-<!-- views/library.ejs -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,66 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Library - MyLibrary</title>
   <link rel="stylesheet" href="/css/style.css">
-  <style>
-    .visibility-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: 0.8em;
-      margin-bottom: 8px;
-    }
-    .visibility-private {
-      background-color: #f0f0f0;
-      color: #333;
-    }
-    .visibility-public {
-      background-color: #d4edda;
-      color: #155724;
-    }
-    .visibility-restricted {
-      background-color: #fff3cd;
-      color: #856404;
-    }
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-      z-index: 1000;
-    }
-    .modal-content {
-      background-color: white;
-      margin: 10% auto;
-      padding: 20px;
-      border-radius: 5px;
-      width: 80%;
-      max-width: 500px;
-    }
-    .close {
-      float: right;
-      font-size: 24px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    .access-list {
-      margin-top: 10px;
-      max-height: 200px;
-      overflow-y: auto;
-    }
-    .access-list-item {
-      padding: 8px;
-      border-bottom: 1px solid #eee;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .visibility-controls {
-      margin-top: 10px;
-    }
-  </style>
 </head>
 <body>
   <header>
@@ -73,10 +12,12 @@
       <h1><a href="/">MyLibrary</a></h1>
       <nav>
         <a href="/library" class="active">My Library</a>
+        <a href="/pinned">Pinned Books</a>
         <a href="/explore">Explore</a>
         <a href="/my-requests">My Requests</a>
         <a href="/access-requests">Access Requests</a>
-        <a href="/upload">Upload Book</a>
+        <a href="/upload">Upload</a>
+        <a href="/account">Account</a>
         <a href="/logout">Logout</a>
       </nav>
     </div>
@@ -85,7 +26,14 @@
   <main class="container">
     <h2>My Library</h2>
     
-    <div class="book-grid">
+    <div class="search-container">
+      <form>
+        <input type="text" id="searchInput" placeholder="Search your library..." required>
+        <button type="button" id="searchButton" class="btn btn-primary">Search</button>
+      </form>
+    </div>
+    
+    <div class="book-grid" id="bookGrid">
       <% if (books.length === 0) { %>
         <div class="empty-state">
           <p>Your library is empty. <a href="/upload">Upload your first book</a> to get started.</p>
@@ -94,20 +42,21 @@
         <% books.forEach(book => { %>
           <div class="book-card" data-id="<%= book._id %>">
             <div class="book-cover">
-              <div class="book-icon">📚</div>
+              <img src="/thumbnail/<%= book._id %>" alt="<%= book.title %> cover" class="thumbnail" onerror="this.src='/images/default-thumbnail.png'">
+              <div class="pin-icon <%= pinnedBooks.includes(book._id.toString()) ? 'pinned' : '' %>" data-book-id="<%= book._id %>">
+                <span class="pin-count"><%= book.pinCount || 0 %></span>
+                📌
+              </div>
             </div>
             <div class="book-info">
               <h3><%= book.title %></h3>
-              <p class="author">by <%= book.author %></p>
+              <p class="author"><%= book.author %></p>
               <span class="visibility-badge visibility-<%= book.visibility %>">
-                <%= book.visibility ? (book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1)) : 'Private' %>
+                <%= book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1) %>
               </span>
-              <p class="upload-date">Uploaded: <%= new Date(book.uploadDate).toLocaleDateString() %></p>
               <div class="book-actions">
-                <a href="/read/<%= book._id %>" class="btn btn-primary">Read</a>
-                <button class="btn btn-secondary manage-sharing" data-book-id="<%= book._id %>" data-visibility="<%= book.visibility %>">
-                  Manage Sharing
-                </button>
+                <a href="/view/<%= book._id %>" class="btn btn-primary">Read</a>
+                <button class="btn btn-secondary manage-sharing" data-book-id="<%= book._id %>" data-visibility="<%= book.visibility %>">Share</button>
                 <button class="btn btn-danger delete-book">Delete</button>
               </div>
             </div>
@@ -117,83 +66,63 @@
     </div>
   </main>
   
-  <!-- Sharing Management Modal -->
   <div id="sharingModal" class="modal">
     <div class="modal-content">
-      <span class="close">&times;</span>
-      <h3>Manage Book Sharing</h3>
+      <span class="close">×</span>
+      <h3>Manage Sharing</h3>
       <p id="bookTitle"></p>
-      
       <div class="visibility-controls">
         <label for="visibilitySelect">Visibility:</label>
         <select id="visibilitySelect">
-          <option value="private">Private (Only you)</option>
-          <option value="public">Public (Anyone)</option>
-          <option value="restricted">Restricted (Selected users)</option>
+          <option value="private">Private</option>
+          <option value="public">Public</option>
+          <option value="restricted">Restricted</option>
         </select>
       </div>
-      
       <div id="accessListSection" style="display: none;">
         <h4>Users with Access</h4>
-        <div class="access-list" id="accessList">
-          <!-- Access list will be populated dynamically -->
-        </div>
+        <div class="access-list" id="accessList"></div>
       </div>
-      
-      <div class="modal-actions" style="margin-top: 20px;">
-        <button id="saveVisibility" class="btn btn-primary">Save Changes</button>
-      </div>
+      <button id="saveVisibility" class="btn btn-primary">Save</button>
     </div>
   </div>
   
   <footer>
     <div class="container">
-      <p>&copy; 2025 MyLibrary. All rights reserved.</p>
+      <p>© 2025 MyLibrary. All rights reserved.</p>
     </div>
   </footer>
   
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      // Delete book functionality
       const deleteButtons = document.querySelectorAll('.delete-book');
-      
       deleteButtons.forEach(button => {
         button.addEventListener('click', async (e) => {
           const bookCard = e.target.closest('.book-card');
           const bookId = bookCard.dataset.id;
-          
-          if (confirm('Are you sure you want to delete this book? This action cannot be undone.')) {
+          if (confirm('Are you sure you want to delete this book?')) {
             try {
-              const response = await fetch(`/book/${bookId}`, {
-                method: 'DELETE'
-              });
-              
+              const response = await fetch(`/book/${bookId}`, { method: 'DELETE' });
               const data = await response.json();
-              
               if (data.success) {
                 bookCard.remove();
-                
-                // If all books are removed, show empty state
                 if (document.querySelectorAll('.book-card').length === 0) {
-                  const bookGrid = document.querySelector('.book-grid');
-                  bookGrid.innerHTML = `
+                  document.querySelector('.book-grid').innerHTML = `
                     <div class="empty-state">
                       <p>Your library is empty. <a href="/upload">Upload your first book</a> to get started.</p>
                     </div>
                   `;
                 }
               } else {
-                alert('Failed to delete book');
+                alert(data.message || 'Failed to delete book');
               }
             } catch (err) {
-              console.error('Error:', err);
-              alert('An error occurred');
+              alert('Error deleting book');
             }
           }
         });
       });
-      
-      // Sharing management functionality
+
       const sharingButtons = document.querySelectorAll('.manage-sharing');
       const modal = document.getElementById('sharingModal');
       const closeBtn = document.querySelector('.close');
@@ -202,8 +131,7 @@
       const accessList = document.getElementById('accessList');
       const saveBtn = document.getElementById('saveVisibility');
       let currentBookId = null;
-      
-      // Open modal when clicking Manage Sharing
+
       sharingButtons.forEach(button => {
         button.addEventListener('click', async (e) => {
           const bookCard = e.target.closest('.book-card');
@@ -214,141 +142,247 @@
           currentBookId = bookId;
           document.getElementById('bookTitle').textContent = bookTitle;
           visibilitySelect.value = currentVisibility;
-          
-          // Show/hide access list section based on visibility
           toggleAccessListSection(currentVisibility);
-          
-          // If restricted, fetch users with access
           if (currentVisibility === 'restricted') {
             await fetchAccessList(bookId);
           }
-          
           modal.style.display = 'block';
         });
       });
-      
-      // Close modal when clicking X
+
       closeBtn.addEventListener('click', () => {
         modal.style.display = 'none';
       });
-      
-      // Close modal when clicking outside
+
       window.addEventListener('click', (e) => {
         if (e.target === modal) {
           modal.style.display = 'none';
         }
       });
-      
-      // Toggle access list section visibility
+
       visibilitySelect.addEventListener('change', () => {
         toggleAccessListSection(visibilitySelect.value);
       });
-      
-      // Save changes
+
       saveBtn.addEventListener('click', async () => {
         const newVisibility = visibilitySelect.value;
-        
         try {
           const response = await fetch(`/book/${currentBookId}/visibility`, {
             method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ visibility: newVisibility })
           });
-          
           const data = await response.json();
-          
           if (data.success) {
-            // Update the UI
             const bookCard = document.querySelector(`.book-card[data-id="${currentBookId}"]`);
             const visibilityBadge = bookCard.querySelector('.visibility-badge');
             const manageSharingBtn = bookCard.querySelector('.manage-sharing');
-            
             visibilityBadge.className = `visibility-badge visibility-${newVisibility}`;
             visibilityBadge.textContent = newVisibility.charAt(0).toUpperCase() + newVisibility.slice(1);
             manageSharingBtn.dataset.visibility = newVisibility;
-            
             modal.style.display = 'none';
-            alert('Visibility updated successfully');
+            alert('Visibility updated');
           } else {
             alert(data.message || 'Failed to update visibility');
           }
         } catch (err) {
-          console.error('Error:', err);
-          alert('An error occurred');
+          alert('Error updating visibility');
         }
       });
-      
-      // Helper function to toggle access list section
+
       function toggleAccessListSection(visibility) {
-        if (visibility === 'restricted') {
-          accessListSection.style.display = 'block';
-        } else {
-          accessListSection.style.display = 'none';
-        }
+        accessListSection.style.display = visibility === 'restricted' ? 'block' : 'none';
       }
-      
-      // Fetch users with access to the book
+
       async function fetchAccessList(bookId) {
         try {
           const response = await fetch(`/book/${bookId}/access-list`);
           const data = await response.json();
-          
           if (data.success) {
-            // Populate access list
-            accessList.innerHTML = '';
-            
-            if (data.users.length === 0) {
-              accessList.innerHTML = '<p>No users have been granted access yet.</p>';
-            } else {
-              data.users.forEach(user => {
-                const listItem = document.createElement('div');
-                listItem.className = 'access-list-item';
-                
-                listItem.innerHTML = `
-                  <span>${user.username} (${user.email})</span>
-                  <button class="btn btn-small btn-danger remove-access" data-user-id="${user._id}">Remove</button>
-                `;
-                
-                accessList.appendChild(listItem);
-              });
-              
-              // Add event listeners to remove buttons
-              document.querySelectorAll('.remove-access').forEach(button => {
-                button.addEventListener('click', async (e) => {
-                  const userId = e.target.dataset.userId;
-                  
-                  try {
-                    const response = await fetch(`/book/${currentBookId}/access/${userId}`, {
-                      method: 'DELETE'
-                    });
-                    
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                      e.target.closest('.access-list-item').remove();
-                      
-                      if (accessList.children.length === 0) {
-                        accessList.innerHTML = '<p>No users have been granted access yet.</p>';
-                      }
-                    } else {
-                      alert(data.message || 'Failed to remove access');
+            accessList.innerHTML = data.users.length === 0 ? '<p>No users have access.</p>' : '';
+            data.users.forEach(user => {
+              const listItem = document.createElement('div');
+              listItem.className = 'access-list-item';
+              listItem.innerHTML = `
+                <span>${user.username} (${user.email})</span>
+                <button class="btn btn-small btn-danger remove-access" data-user-id="${user._id}">Remove</button>
+              `;
+              accessList.appendChild(listItem);
+            });
+            document.querySelectorAll('.remove-access').forEach(button => {
+              button.addEventListener('click', async (e) => {
+                const userId = e.target.dataset.userId;
+                try {
+                  const response = await fetch(`/book/${currentBookId}/access/${userId}`, { method: 'DELETE' });
+                  const data = await response.json();
+                  if (data.success) {
+                    e.target.closest('.access-list-item').remove();
+                    if (accessList.children.length === 0) {
+                      accessList.innerHTML = '<p>No users have access.</p>';
                     }
-                  } catch (err) {
-                    console.error('Error:', err);
-                    alert('An error occurred');
+                  } else {
+                    alert(data.message || 'Failed to remove access');
                   }
-                });
+                } catch (err) {
+                  alert('Error removing access');
+                }
               });
-            }
+            });
           } else {
             accessList.innerHTML = '<p>Failed to load access list.</p>';
           }
         } catch (err) {
-          console.error('Error:', err);
           accessList.innerHTML = '<p>Failed to load access list.</p>';
         }
+      }
+
+      const pinButtons = document.querySelectorAll('.pin-icon');
+      pinButtons.forEach(button => {
+        button.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const bookId = button.dataset.bookId;
+          try {
+            const response = await fetch(`/book/${bookId}/pin`, { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+              button.classList.toggle('pinned');
+              const pinCountSpan = button.querySelector('.pin-count');
+              pinCountSpan.textContent = data.pinCount;
+            } else {
+              alert('Failed to update pin status');
+            }
+          } catch (err) {
+            alert('Error updating pin');
+          }
+        });
+      });
+
+      const searchInput = document.getElementById('searchInput');
+      const searchButton = document.getElementById('searchButton');
+      const bookGrid = document.getElementById('bookGrid');
+      
+      searchButton.addEventListener('click', performSearch);
+      searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          performSearch();
+        }
+      });
+      
+      async function performSearch() {
+        const query = searchInput.value.trim();
+        if (!query) return;
+        try {
+          const response = await fetch(`/library/search?query=${encodeURIComponent(query)}`);
+          const data = await response.json();
+          if (data.books) {
+            bookGrid.innerHTML = '';
+            if (data.books.length === 0) {
+              bookGrid.innerHTML = `
+                <div class="empty-state">
+                  <p>No books found for "${query}". <a href="/upload">Upload a book</a>.</p>
+                </div>
+              `;
+            } else {
+              data.books.forEach(book => {
+                const isPinned = '<%= user.pinnedBooks %>'.includes(book._id);
+                const bookCard = document.createElement('div');
+                bookCard.className = 'book-card';
+                bookCard.dataset.id = book._id;
+                bookCard.innerHTML = `
+                  <div class="book-cover">
+                    <img src="/thumbnail/${book._id}" alt="${book.title} cover" class="thumbnail" onerror="this.src='/images/default-thumbnail.png'">
+                    <div class="pin-icon ${isPinned ? 'pinned' : ''}" data-book-id="${book._id}">
+                      <span class="pin-count">${book.pinCount || 0}</span>
+                      📌
+                    </div>
+                  </div>
+                  <div class="book-info">
+                    <h3>${book.title}</h3>
+                    <p class="author">${book.author}</p>
+                    <span class="visibility-badge visibility-${book.visibility}">
+                      ${book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1)}
+                    </span>
+                    <div class="book-actions">
+                      <a href="/view/${book._id}" class="btn btn-primary">Read</a>
+                      <button class="btn btn-secondary manage-sharing" data-book-id="${book._id}" data-visibility="${book.visibility}">Share</button>
+                      <button class="btn btn-danger delete-book">Delete</button>
+                    </div>
+                  </div>
+                `;
+                bookGrid.appendChild(bookCard);
+              });
+              attachEventListeners();
+            }
+          }
+        } catch (err) {
+          alert('Search error');
+        }
+      }
+
+      function attachEventListeners() {
+        document.querySelectorAll('.delete-book').forEach(button => {
+          button.addEventListener('click', async (e) => {
+            const bookCard = e.target.closest('.book-card');
+            const bookId = bookCard.dataset.id;
+            if (confirm('Are you sure you want to delete this book?')) {
+              try {
+                const response = await fetch(`/book/${bookId}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (data.success) {
+                  bookCard.remove();
+                  if (document.querySelectorAll('.book-card').length === 0) {
+                    document.querySelector('.book-grid').innerHTML = `
+                      <div class="empty-state">
+                        <p>Your library is empty. <a href="/upload">Upload your first book</a> to get started.</p>
+                      </div>
+                    `;
+                  }
+                } else {
+                  alert(data.message || 'Failed to delete book');
+                }
+              } catch (err) {
+                alert('Error deleting book');
+              }
+            }
+          });
+        });
+
+        document.querySelectorAll('.pin-icon').forEach(button => {
+          button.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const bookId = button.dataset.bookId;
+            try {
+              const response = await fetch(`/book/${bookId}/pin`, { method: 'POST' });
+              const data = await response.json();
+              if (data.success) {
+                button.classList.toggle('pinned');
+                const pinCountSpan = button.querySelector('.pin-count');
+                pinCountSpan.textContent = data.pinCount;
+              } else {
+                alert('Failed to update pin status');
+              }
+            } catch (err) {
+              alert('Error updating pin');
+            }
+          });
+        });
+
+        document.querySelectorAll('.manage-sharing').forEach(button => {
+          button.addEventListener('click', async (e) => {
+            const bookCard = e.target.closest('.book-card');
+            const bookId = button.dataset.bookId;
+            const bookTitle = bookCard.querySelector('h3').textContent;
+            const currentVisibility = button.dataset.visibility;
+            currentBookId = bookId;
+            document.getElementById('bookTitle').textContent = bookTitle;
+            visibilitySelect.value = currentVisibility;
+            toggleAccessListSection(currentVisibility);
+            if (currentVisibility === 'restricted') {
+              await fetchAccessList(bookId);
+            }
+            modal.style.display = 'block';
+          });
+        });
       }
     });
   </script>

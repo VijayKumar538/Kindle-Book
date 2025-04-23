@@ -13,10 +13,12 @@
       <h1><a href="/">MyLibrary</a></h1>
       <nav>
         <a href="/library">My Library</a>
+        <a href="/pinned">Pinned Books</a>
         <a href="/explore">Explore</a>
         <a href="/my-requests" class="active">My Requests</a>
         <a href="/access-requests">Access Requests</a>
         <a href="/upload">Upload Book</a>
+        <a href="/account">Account</a>
         <a href="/logout">Logout</a>
       </nav>
     </div>
@@ -35,24 +37,34 @@
           <thead>
             <tr>
               <th>Book</th>
+              <th>Author</th>
               <th>Owner</th>
               <th>Request Date</th>
+              <th>Response Date</th>
               <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             <% requests.forEach(request => { %>
               <tr>
                 <td><%= request.book ? request.book.title : 'Unknown Book' %></td>
+                <td><%= request.book ? request.book.author : 'Unknown Author' %></td>
                 <td><%= request.bookOwner ? request.bookOwner.username : 'Unknown User' %></td>
                 <td><%= new Date(request.requestDate).toLocaleDateString() %></td>
+                <td><%= request.responseDate ? new Date(request.responseDate).toLocaleDateString() : 'Awaiting Response' %></td>
                 <td>
                   <span class="status-badge status-<%= request.status %>">
                     <%= request.status.charAt(0).toUpperCase() + request.status.slice(1) %>
                   </span>
-                  
+                </td>
+                <td>
                   <% if (request.status === 'approved') { %>
-                    <a href="/read/<%= request.book._id %>" class="btn btn-small btn-primary">Read</a>
+                    <a href="/view/<%= request.book._id %>" class="btn btn-small btn-primary">View</a>
+                  <% } else if (request.status === 'pending') { %>
+                    <span class="pending-message">Awaiting approval</span>
+                  <% } else { %>
+                    <span class="declined-message">Access denied</span>
                   <% } %>
                 </td>
               </tr>
@@ -68,5 +80,32 @@
       <p>&copy; 2025 MyLibrary. All rights reserved.</p>
     </div>
   </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Format dates for better display
+      const formatDates = () => {
+        const dateElements = document.querySelectorAll('td:nth-child(4), td:nth-child(5)');
+        dateElements.forEach(element => {
+          const dateText = element.textContent.trim();
+          if (dateText !== 'Awaiting Response') {
+            try {
+              const date = new Date(dateText);
+              const formattedDate = date.toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              });
+              element.textContent = formattedDate;
+            } catch (err) {
+              console.error('Error formatting date:', err);
+            }
+          }
+        });
+      };
+      
+      formatDates();
+    });
+  </script>
 </body>
 </html>

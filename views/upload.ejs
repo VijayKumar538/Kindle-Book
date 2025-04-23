@@ -1,4 +1,3 @@
-<!-- views/upload.ejs -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,6 +5,85 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Upload Book - MyLibrary</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .alert {
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .alert-error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .alert .close-btn {
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 1.2em;
+      line-height: 1;
+      border: none;
+      background: none;
+      padding: 0 5px;
+    }
+    .form-container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .form-help {
+      font-size: 0.9em;
+      color: #666;
+      margin-top: 5px;
+    }
+    .file-help {
+      font-size: 0.9em;
+      color: #721c24;
+    }
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1em;
+      background-color: #4285f4;
+      color: white;
+    }
+    .btn-primary {
+      background-color: #4285f4;
+    }
+    .btn-primary:hover {
+      background-color: #3267d6;
+    }
+    .visibility-info {
+      display: none;
+      margin-top: 5px;
+      font-size: 0.9em;
+    }
+    .storage-usage {
+      font-size: 0.9em;
+      color: #666;
+      margin-top: 10px;
+    }
+  </style>
 </head>
 <body>
   <header>
@@ -13,10 +91,12 @@
       <h1><a href="/">MyLibrary</a></h1>
       <nav>
         <a href="/library">My Library</a>
+        <a href="/pinned">Pinned Books</a>
         <a href="/explore">Explore</a>
         <a href="/my-requests">My Requests</a>
         <a href="/access-requests">Access Requests</a>
         <a href="/upload" class="active">Upload Book</a>
+        <a href="/account">Account</a>
         <a href="/logout">Logout</a>
       </nav>
     </div>
@@ -28,18 +108,30 @@
     <% if (typeof error !== 'undefined') { %>
       <div class="alert alert-error">
         <%= error %>
+        <button class="close-btn" onclick="this.parentElement.style.display='none'">&times;</button>
       </div>
     <% } %>
     
     <form action="/upload" method="POST" enctype="multipart/form-data">
       <div class="form-group">
-        <label for="title">Book Title</label>
+        <label for="title">Title</label>
         <input type="text" id="title" name="title" required>
       </div>
       
       <div class="form-group">
         <label for="author">Author</label>
         <input type="text" id="author" name="author" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="description">Description</label>
+        <textarea id="description" name="description" rows="3"></textarea>
+      </div>
+      
+      <div class="form-group">
+        <label for="tags">Tags</label>
+        <input type="text" id="tags" name="tags" placeholder="fiction, science, textbook (comma-separated)">
+        <p class="form-help">Separate tags with commas</p>
       </div>
       
       <div class="form-group">
@@ -50,16 +142,22 @@
           <option value="restricted">Restricted (Specific users with permission)</option>
         </select>
         <p class="form-help">
-          <span class="visibility-info private">Private: Only you can view and access this book.</span>
-          <span class="visibility-info public">Public: Any user can view and read this book.</span>
-          <span class="visibility-info restricted">Restricted: Only users you approve can access this book.</span>
+          <span class="visibility-info private">Private: Only you can view and access this content.</span>
+          <span class="visibility-info public">Public: Any user can view and read this content.</span>
+          <span class="visibility-info restricted">Restricted: Only users you approve can access this content.</span>
         </p>
       </div>
       
       <div class="form-group file-input">
-        <label for="book">PDF File</label>
-        <input type="file" id="book" name="book" accept="application/pdf" required>
-        <p class="file-help">Only PDF files are allowed (max 10MB)</p>
+        <label for="file">File</label>
+        <input type="file" id="file" name="file" accept="application/pdf" required>
+        <p class="file-help">Only PDF files are supported (max 50MB)</p>
+      </div>
+      
+      <div class="form-group">
+        <div class="storage-usage">
+          <p>Note: Your uploaded files count toward your storage limit</p>
+        </div>
       </div>
       
       <button type="submit" class="btn btn-primary">Upload Book</button>
@@ -68,7 +166,7 @@
   
   <footer>
     <div class="container">
-      <p>&copy; 2025 MyLibrary. All rights reserved.</p>
+      <p>© 2025 MyLibrary. All rights reserved.</p>
     </div>
   </footer>
   
@@ -100,6 +198,31 @@
       
       // Update when selection changes
       visibilitySelect.addEventListener('change', showRelevantInfo);
+
+      // File validation
+      const fileInput = document.getElementById('file');
+      const fileHelp = document.querySelector('.file-help');
+      const originalHelpText = fileHelp.textContent;
+      
+      fileInput.addEventListener('change', () => {
+        const file = fileInput.files[0];
+        if (file) {
+          // Check file size (50MB limit)
+          const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+          if (file.size > maxSize) {
+            fileHelp.textContent = 'Error: File exceeds the 50MB size limit';
+            fileHelp.style.color = 'red';
+            fileInput.value = ''; // Clear the selection
+          } else if (file.type !== 'application/pdf') {
+            fileHelp.textContent = 'Error: Only PDF files are allowed';
+            fileHelp.style.color = 'red';
+            fileInput.value = ''; // Clear the selection
+          } else {
+            fileHelp.textContent = originalHelpText;
+            fileHelp.style.color = '';
+          }
+        }
+      });
     });
   </script>
 </body>

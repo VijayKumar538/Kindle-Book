@@ -14,7 +14,12 @@
       <nav>
         <% if (user) { %>
           <a href="/library">My Library</a>
-          <a href="/upload">Upload Book</a>
+          <a href="/pinned">Pinned Books</a>
+          <a href="/explore">Explore</a>
+          <a href="/upload">Upload</a>
+          <a href="/my-requests">My Requests</a>
+          <a href="/access-requests">Access Requests</a>
+          <a href="/account">Account</a>
           <a href="/logout">Logout</a>
         <% } else { %>
           <a href="/login">Login</a>
@@ -26,30 +31,35 @@
   
   <main class="container">
     <section class="hero">
-      <h2>Your Personal Digital Library</h2>
-      <p>Upload, organize, and read your books anytime, anywhere.</p>
+      <h2>Your Personal Digital Reading Platform</h2>
+      <p>Upload, organize, share, and read your digital content anytime, anywhere.</p>
       <div class="cta-buttons">
         <% if (!user) { %>
           <a href="/signup" class="btn btn-primary">Get Started</a>
           <a href="/login" class="btn btn-secondary">Login</a>
         <% } else { %>
           <a href="/library" class="btn btn-primary">Go to My Library</a>
+          <a href="/explore" class="btn btn-secondary">Discover Books</a>
         <% } %>
       </div>
     </section>
     
     <section class="features">
       <div class="feature">
-        <h3>Upload Your Collection</h3>
-        <p>Easily upload and organize your books in one place.</p>
+        <h3>PDF Support</h3>
+        <p>Upload and read PDFs seamlessly.</p>
       </div>
       <div class="feature">
-        <h3>Read Anywhere</h3>
-        <p>Access your library from any device with an internet connection.</p>
+        <h3>Share Books</h3>
+        <p>Share your books with friends or the public.</p>
       </div>
       <div class="feature">
-        <h3>Secure Storage</h3>
-        <p>Your books are safely stored in our database for you to access anytime.</p>
+        <h3>Built-in Reader</h3>
+        <p>Read PDFs directly in your browser.</p>
+      </div>
+      <div class="feature">
+        <h3>Pin Favorites</h3>
+        <p>Keep your favorite books easily accessible.</p>
       </div>
     </section>
   </main>
@@ -59,5 +69,7 @@
       <p>&copy; 2025 MyLibrary. All rights reserved.</p>
     </div>
   </footer>
+
+  <script src="/js/main.js"></script>
 </body>
 </html>

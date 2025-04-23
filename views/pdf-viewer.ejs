@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= book.title %> - PDF Viewer - Kindle Clone</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/js/all.min.js"></script>
+    <style>
+        .pdf-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 120px);
+            width: 100%;
+        }
+        
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .toolbar-left, .toolbar-center, .toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .page-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .page-controls button {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: #555;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+        
+        .page-controls button:hover {
+            background-color: #e0e0e0;
+        }
+        
+        .page-controls button:disabled {
+            color: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .page-info {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        #pageNumber {
+            width: 50px;
+            text-align: center;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #canvas-container {
+            flex-grow: 1;
+            overflow: auto;
+            background-color: #525659;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        #pdf-canvas {
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            background-color: white;
+        }
+        
+        .book-title {
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 300px;
+        }
+        
+        .toolbar-button {
+            background: none;
+            border: none;
+            font-size: 0.9rem;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #555;
+            transition: background-color 0.2s;
+        }
+        
+        .toolbar-button:hover {
+            background-color: #e0e0e0;
+        }
+        
+        .loading-spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="main-nav">
+            <div class="nav-logo">
+                <a href="/">Kindle Clone</a>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/library">My Library</a></li>
+                <li><a href="/pinned">Pinned Books</a></li>
+            </ul>
+        </nav>
+
+        <div class="pdf-container">
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <a href="javascript:history.back()" class="toolbar-button">
+                        <i class="fas fa-arrow-left"></i> Back
+                    </a>
+                    <span class="book-title"><%= book.title %></span>
+                </div>
+                
+                <div class="toolbar-center">
+                    <div class="page-controls">
+                        <button id="prev" title="Previous Page"><i class="fas fa-chevron-left"></i></button>
+                        <div class="page-info">
+                            <input type="number" id="pageNumber" value="1" min="1">
+                            <span>/ <span id="pageCount">0</span></span>
+                        </div>
+                        <button id="next" title="Next Page"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                
+                <div class="toolbar-right">
+                    <div class="zoom-controls">
+                        <button id="zoomOut" class="toolbar-button" title="Zoom Out">
+                            <i class="fas fa-search-minus"></i>
+                        </button>
+                        <button id="zoomIn" class="toolbar-button" title="Zoom In">
+                            <i class="fas fa-search-plus"></i>
+                        </button>
+                    </div>
+                    <a href="/file/<%= book._id %>" download="<%= book.fileName %>" class="toolbar-button" title="Download">
+                        <i class="fas fa-download"></i> Download
+                    </a>
+                    <button id="toggleFullscreen" class="toolbar-button" title="Fullscreen">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="canvas-container">
+                <canvas id="pdf-canvas"></canvas>
+                
+                <div class="loading-spinner" id="loading">
+                    <div class="spinner"></div>
+                    <p>Loading PDF...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up PDF.js
+            const pdfjsLib = window['pdfjs-dist/build/pdf'];
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.worker.min.js';
+            
+            let pdfDoc = null;
+            let pageNum = 1;
+            let pageRendering = false;
+            let pageNumPending = null;
+            let scale = 1.0;
+            const canvas = document.getElementById('pdf-canvas');
+            const ctx = canvas.getContext('2d');
+            const container = document.getElementById('canvas-container');
+            const loading = document.getElementById('loading');
+            
+            // Load the PDF
+            const loadingTask = pdfjsLib.getDocument('/file/<%= book._id %>');
+            loadingTask.promise.then(function(pdf) {
+                pdfDoc = pdf;
+                document.getElementById('pageCount').textContent = pdf.numPages;
+                
+                // Initial page render
+                renderPage(pageNum);
+                
+                // Hide loading spinner when PDF is loaded
+                loading.style.display = 'none';
+            }).catch(function(error) {
+                console.error('Error loading PDF:', error);
+                loading.innerHTML = '<p>Error loading PDF. Please try again later.</p>';
+            });
+            
+            // Render the specified page
+            function renderPage(num) {
+                pageRendering = true;
+                
+                // Show loading while page renders
+                loading.style.display = 'flex';
+                
+                // Get the page
+                pdfDoc.getPage(num).then(function(page) {
+                    // Set scale based on viewport width
+                    const viewport = page.getViewport({ scale });
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+                    
+                    // Render PDF page into canvas context
+                    const renderContext = {
+                        canvasContext: ctx,
+                        viewport: viewport
+                    };
+                    
+                    const renderTask = page.render(renderContext);
+                    
+                    // Wait for rendering to finish
+                    renderTask.promise.then(function() {
+                        pageRendering = false;
+                        loading.style.display = 'none';
+                        
+                        // Update page counters
+                        document.getElementById('pageNumber').value = num;
+                        
+                        // If another page rendering is pending, render that page
+                        if (pageNumPending !== null) {
+                            renderPage(pageNumPending);
+                            pageNumPending = null;
+                        }
+                    });
+                });
+            }
+            
+            // Page changing functions
+            function queueRenderPage(num) {
+                if (pageRendering) {
+                    pageNumPending = num;
+                } else {
+                    renderPage(num);
+                }
+            }
+            
+            function onPrevPage() {
+                if (pageNum <= 1) {
+                    return;
+                }
+                pageNum--;
+                queueRenderPage(pageNum);
+            }
+            
+            function onNextPage() {
+                if (pageNum >= pdfDoc.numPages) {
+                    return;
+                }
+                pageNum++;
+                queueRenderPage(pageNum);
+            }
+            
+            // Button events
+            document.getElementById('prev').addEventListener('click', onPrevPage);
+            document.getElementById('next').addEventListener('click', onNextPage);
+            
+            // Page input
+            document.getElementById('pageNumber').addEventListener('change', function() {
+                const input = parseInt(this.value);
+                if (input > 0 && input <= pdfDoc.numPages) {
+                    pageNum = input;
+                    queueRenderPage(pageNum);
+                } else {
+                    this.value = pageNum;
+                }
+            });
+            
+            // Zoom functions
+            document.getElementById('zoomIn').addEventListener('click', function() {
+                scale *= 1.2;
+                queueRenderPage(pageNum);
+            });
+            
+            document.getElementById('zoomOut').addEventListener('click', function() {
+                scale /= 1.2;
+                if (scale < 0.5) scale = 0.5;
+                queueRenderPage(pageNum);
+            });
+            
+            // Fullscreen toggle
+            document.getElementById('toggleFullscreen').addEventListener('click', function() {
+                const container = document.querySelector('.pdf-container');
+                
+                if (!document.fullscreenElement) {
+                    if (container.requestFullscreen) {
+                        container.requestFullscreen();
+                    } else if (container.mozRequestFullScreen) { // Firefox
+                        container.mozRequestFullScreen();
+                    } else if (container.webkitRequestFullscreen) { // Chrome, Safari, Opera
+                        container.webkitRequestFullscreen();
+                    } else if (container.msRequestFullscreen) { // IE/Edge
+                        container.msRequestFullscreen();
+                    }
+                    this.innerHTML = '<i class="fas fa-compress"></i>';
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.mozCancelFullScreen) {
+                        document.mozCancelFullScreen();
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                    } else if (document.msExitFullscreen) {
+                        document.msExitFullscreen();
+                    }
+                    this.innerHTML = '<i class="fas fa-expand"></i>';
+                }
+            });
+            
+            // Handle fullscreen change
+            document.addEventListener('fullscreenchange', updateFullscreenButton);
+            document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+            document.addEventListener('mozfullscreenchange', updateFullscreenButton);
+            document.addEventListener('MSFullscreenChange', updateFullscreenButton);
+            
+            function updateFullscreenButton() {
+                const button = document.getElementById('toggleFullscreen');
+                if (document.fullscreenElement) {
+                    button.innerHTML = '<i class="fas fa-compress"></i>';
+                } else {
+                    button.innerHTML = '<i class="fas fa-expand"></i>';
+                }
+            }
+            
+            // Handle keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'ArrowRight' || e.key === ' ') {
+                    onNextPage();
+                } else if (e.key === 'ArrowLeft') {
+                    onPrevPage();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

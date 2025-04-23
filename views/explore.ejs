@@ -1,115 +1,359 @@
-<!-- views/explore.ejs -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Explore Books - MyLibrary</title>
-  <link rel="stylesheet" href="/css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explore Books - MyLibrary</title>
+    <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-  <header>
-    <div class="container">
-      <h1><a href="/">MyLibrary</a></h1>
-      <nav>
-        <a href="/library">My Library</a>
-        <a href="/explore" class="active">Explore</a>
-        <a href="/my-requests">My Requests</a>
-        <a href="/access-requests">Access Requests</a>
-        <a href="/upload">Upload Book</a>
-        <a href="/logout">Logout</a>
-      </nav>
-    </div>
-  </header>
-  
-  <main class="container">
-    <h2>Explore Books</h2>
-    
-    <div class="book-grid">
-      <% if (books.length === 0) { %>
-        <div class="empty-state">
-          <p>No books available at the moment.</p>
+    <header>
+        <div class="container">
+            <h1><a href="/">MyLibrary</a></h1>
+            <nav>
+                <a href="/library">My Library</a>
+                <a href="/pinned">Pinned Books</a>
+                <a href="/explore" class="active">Explore</a>
+                <a href="/my-requests">My Requests</a>
+                <a href="/access-requests">Access Requests</a>
+                <a href="/upload">Upload</a>
+                <a href="/account">Account</a>
+                <a href="/logout">Logout</a>
+            </nav>
         </div>
-      <% } else { %>
-        <% books.forEach(book => { %>
-          <div class="book-card" data-id="<%= book._id %>">
-            <div class="book-cover">
-              <div class="book-icon">📚</div>
-            </div>
-            <div class="book-info">
-              <h3><%= book.title %></h3>
-              <p class="author">by <%= book.author %></p>
-              <p class="owner">Shared by: <%= book.uploadedBy ? book.uploadedBy.username : 'Unknown' %></p>
-              <p class="visibility">
-                <span class="visibility-badge visibility-<%= book.visibility %>">
-                  <%= book.visibility === 'public' ? 'Public' : (book.visibility === 'restricted' ? 'Restricted' : 'Private') %>
-                </span>
-              </p>
-              <div class="book-actions">
-                <% if (book.visibility === 'public') { %>
-                  <a href="/read/<%= book._id %>" class="btn btn-primary">Read</a>
-                <% } else if (book.visibility === 'restricted') { %>
-                  <% if (book.accessList && book.accessList.includes(currentUser)) { %>
-                    <a href="/read/<%= book._id %>" class="btn btn-primary">Read</a>
-                  <% } else { %>
-                    <% if (pendingBookIds.includes(book._id.toString())) { %>
-                      <button class="btn btn-secondary" disabled>Request Pending</button>
-                    <% } else { %>
-                      <button class="btn btn-primary request-access" data-book-id="<%= book._id %>">Request Access</button>
-                    <% } %>
-                  <% } %>
+    </header>
+    
+    <main class="container">
+        <h2>Explore Books</h2>
+        
+        <!-- Search functionality -->
+        <div class="search-container">
+            <form id="search-form">
+                <input type="text" id="search-input" placeholder="Search by title, author or tags">
+                <button type="submit" class="btn">Search</button>
+                <button type="button" id="debugBooks" class="btn btn-secondary">Debug Books</button>
+            </form>
+        </div>
+
+        <!-- Trending Books Section -->
+        <section class="trending-books">
+            <h3>Trending Books</h3>
+            <div class="book-grid" id="trending-books-container">
+                <% if (trendingBooks && trendingBooks.length > 0) { %>
+                    <% trendingBooks.forEach(book => { %>
+                        <div class="book-card" data-id="<%= book._id %>">
+                            <div class="book-cover">
+                                <img src="/thumbnail/<%= book._id %>" alt="<%= book.title %> cover" class="thumbnail" onerror="this.src='/images/default-thumbnail.png'">
+                                <div class="pin-icon <%= pinnedBooks.includes(book._id.toString()) ? 'pinned' : '' %>" data-book-id="<%= book._id %>">
+                                    <span class="pin-count"><%= book.pinCount || 0 %></span>
+                                    📌
+                                </div>
+                            </div>
+                            <div class="book-info">
+                                <h3><%= book.title %></h3>
+                                <p class="author">by <%= book.author %></p>
+                                <p class="owner">Shared by: <%= book.uploadedBy ? book.uploadedBy.username : 'Unknown' %></p>
+                                <p class="file-type"><%= book.fileType.toUpperCase() %></p>
+                                <p class="visibility">
+                                    <span class="visibility-badge visibility-<%= book.visibility %>">
+                                        <%= book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1) %>
+                                    </span>
+                                </p>
+                                <div class="book-actions">
+                                    <a href="/view/<%= book._id %>" class="btn btn-primary">View</a>
+                                    <a href="/file/<%= book._id %>" download="<%= book.fileName %>" class="btn btn-secondary">Download</a>
+                                    <% if (book.visibility === 'restricted' && !book.accessList.includes(currentUser) && !pendingBookIds.includes(book._id.toString())) { %>
+                                        <button class="btn btn-secondary request-access" data-book-id="<%= book._id %>">Request Access</button>
+                                    <% } %>
+                                </div>
+                            </div>
+                        </div>
+                    <% }) %>
                 <% } else { %>
-                  <span class="btn btn-secondary disabled">Private</span>
+                    <div class="empty-state">
+                        <p>No trending books available.</p>
+                    </div>
                 <% } %>
-              </div>
             </div>
-          </div>
-        <% }) %>
-      <% } %>
-    </div>
-  </main>
-  
-  <footer>
-    <div class="container">
-      <p>&copy; 2025 MyLibrary. All rights reserved.</p>
-    </div>
-  </footer>
-  
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const requestButtons = document.querySelectorAll('.request-access');
-      
-      requestButtons.forEach(button => {
-        button.addEventListener('click', async (e) => {
-          const bookId = e.target.dataset.bookId;
-          
-          try {
-            const response = await fetch(`/request-access/${bookId}`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              }
+        </section>
+
+        <!-- All Books Section -->
+        <section class="all-books">
+            <h3>All Books</h3>
+            <div class="book-grid" id="books-container">
+                <% if (books && books.length > 0) { %>
+                    <% books.forEach(book => { %>
+                        <div class="book-card" data-id="<%= book._id %>">
+                            <div class="book-cover">
+                                <img src="/thumbnail/<%= book._id %>" alt="<%= book.title %> cover" class="thumbnail" onerror="this.src='/images/default-thumbnail.png'">
+                                <div class="pin-icon <%= pinnedBooks.includes(book._id.toString()) ? 'pinned' : '' %>" data-book-id="<%= book._id %>">
+                                    <span class="pin-count"><%= book.pinCount || 0 %></span>
+                                    📌
+                                </div>
+                            </div>
+                            <div class="book-info">
+                                <h3><%= book.title %></h3>
+                                <p class="author">by <%= book.author %></p>
+                                <p class="owner">Shared by: <%= book.uploadedBy ? book.uploadedBy.username : 'Unknown' %></p>
+                                <p class="file-type"><%= book.fileType.toUpperCase() %></p>
+                                <p class="visibility">
+                                    <span class="visibility-badge visibility-<%= book.visibility %>">
+                                        <%= book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1) %>
+                                    </span>
+                                </p>
+                                <div class="book-actions">
+                                    <a href="/view/<%= book._id %>" class="btn btn-primary">View</a>
+                                    <a href="/file/<%= book._id %>" download="<%= book.fileName %>" class="btn btn-secondary">Download</a>
+                                    <% if (book.visibility === 'restricted' && !book.accessList.includes(currentUser) && !pendingBookIds.includes(book._id.toString())) { %>
+                                        <button class="btn btn-secondary request-access" data-book-id="<%= book._id %>">Request Access</button>
+                                    <% } %>
+                                </div>
+                            </div>
+                        </div>
+                    <% }) %>
+                <% } else { %>
+                    <div class="empty-state">
+                        <p>No books available.</p>
+                    </div>
+                <% } %>
+            </div>
+        </section>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>© 2025 MyLibrary. All rights reserved.</p>
+        </div>
+    </footer>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const booksContainer = document.getElementById('books-container');
+            const trendingBooksContainer = document.getElementById('trending-books-container');
+            const searchForm = document.getElementById('search-form');
+            const searchInput = document.getElementById('search-input');
+            const debugBooksBtn = document.getElementById('debugBooks');
+
+            // Debug button to log book data
+            debugBooksBtn.addEventListener('click', () => {
+                const books = Array.from(document.querySelectorAll('.book-card')).map(card => ({
+                    id: card.dataset.id,
+                    title: card.querySelector('h3').textContent,
+                    author: card.querySelector('.author').textContent,
+                    pinCount: card.querySelector('.pin-count').textContent,
+                    isPinned: card.querySelector('.pin-icon').classList.contains('pinned')
+                }));
+                console.log('Explore Books Data:', books);
+                alert('Book data logged to Console');
             });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-              // Update UI to show pending
-              e.target.textContent = 'Request Pending';
-              e.target.disabled = true;
-              e.target.classList.remove('btn-primary');
-              e.target.classList.add('btn-secondary');
-              alert('Access request sent successfully');
-            } else {
-              alert(data.message || 'Failed to send request');
+
+            // Check session status
+            async function checkSession() {
+                try {
+                    const response = await fetch('/account/storage-info', {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    if (!response.ok || response.status === 401) {
+                        console.warn('Session check failed, redirecting to login');
+                        window.location.href = '/login';
+                        return false;
+                    }
+                    return true;
+                } catch (err) {
+                    console.error('Session check error:', err);
+                    return false;
+                }
             }
-          } catch (err) {
-            console.error('Error:', err);
-            alert('An error occurred while sending the request');
-          }
+
+            // Event delegation for pin/unpin
+            [booksContainer, trendingBooksContainer].forEach(container => {
+                container.addEventListener('click', async (e) => {
+                    const pinIcon = e.target.closest('.pin-icon');
+                    if (!pinIcon) return;
+
+                    const bookId = pinIcon.dataset.bookId;
+                    console.log(`Pin/Unpin: Initiating for bookId=${bookId}`);
+
+                    // Verify session
+                    const isAuthenticated = await checkSession();
+                    if (!isAuthenticated) {
+                        alert('Session expired. Please log in again.');
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(`/book/${bookId}/pin?t=${Date.now()}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+
+                        console.log(`Pin/Unpin: Response status=${response.status}, ok=${response.ok}, Content-Type=${response.headers.get('Content-Type')}`);
+
+                        if (!response.ok) {
+                            const contentType = response.headers.get('Content-Type');
+                            let errorText = await response.text();
+                            if (contentType.includes('text/html')) {
+                                errorText = 'Received HTML response (possibly a login redirect)';
+                            }
+                            throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+                        }
+
+                        const data = await response.json();
+                        console.log(`Pin/Unpin: Response data=`, data);
+
+                        if (data.success) {
+                            const pinCountElement = pinIcon.querySelector('.pin-count');
+                            pinCountElement.textContent = data.pinCount;
+
+                            if (data.isPinned) {
+                                pinIcon.classList.add('pinned');
+                            } else {
+                                pinIcon.classList.remove('pinned');
+                            }
+                        } else {
+                            console.warn(`Pin/Unpin: Server returned success=false, message=${data.message}`);
+                            alert(`Failed to update pin status: ${data.message}`);
+                        }
+                    } catch (err) {
+                        console.error(`Pin/Unpin: Error for bookId=${bookId}:`, err);
+                        alert(`Error updating pin status: ${err.message}`);
+                    }
+                });
+            });
+
+            // Request access
+            [booksContainer, trendingBooksContainer].forEach(container => {
+                container.addEventListener('click', async (e) => {
+                    const requestBtn = e.target.closest('.request-access');
+                    if (!requestBtn) return;
+
+                    const bookId = requestBtn.dataset.bookId;
+                    console.log(`Request Access: Initiating for bookId=${bookId}`);
+
+                    try {
+                        const response = await fetch(`/request-access/${bookId}?t=${Date.now()}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+
+                        console.log(`Request Access: Response status=${response.status}, ok=${response.ok}`);
+
+                        if (!response.ok) {
+                            const contentType = response.headers.get('Content-Type');
+                            let errorText = await response.text();
+                            if (contentType.includes('text/html')) {
+                                errorText = 'Received HTML response (possibly a login redirect)';
+                            }
+                            throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+                        }
+
+                        const data = await response.json();
+                        console.log(`Request Access: Response data=`, data);
+
+                        if (data.success) {
+                            requestBtn.textContent = 'Request Sent';
+                            requestBtn.disabled = true;
+                            requestBtn.classList.add('disabled');
+                        } else {
+                            console.warn(`Request Access: Server returned success=false, message=${data.message}`);
+                            alert(`Failed to request access: ${data.message}`);
+                        }
+                    } catch (err) {
+                        console.error(`Request Access: Error for bookId=${bookId}:`, err);
+                        alert(`Error requesting access: ${err.message}`);
+                    }
+                });
+            });
+
+            // Search functionality
+            searchForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const query = searchInput.value.trim();
+                if (!query) return;
+
+                console.log(`Search: Query="${query}"`);
+
+                try {
+                    const response = await fetch(`/explore/search?query=${encodeURIComponent(query)}&t=${Date.now()}`, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    console.log(`Search: Response status=${response.status}, ok=${response.ok}, Content-Type=${response.headers.get('Content-Type')}`);
+
+                    if (!response.ok) {
+                        const contentType = response.headers.get('Content-Type');
+                        let errorText = await response.text();
+                        if (contentType.includes('text/html')) {
+                            errorText = 'Received HTML response (possibly a login redirect)';
+                        }
+                        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+                    }
+
+                    const data = await response.json();
+                    console.log(`Search: Response data=`, data);
+
+                    booksContainer.innerHTML = '';
+
+                    if (!data.books || data.books.length === 0) {
+                        booksContainer.innerHTML = `
+                            <div class="empty-state">
+                                <p>No books found matching your search.</p>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    data.books.forEach(book => {
+                        const isPinned = <%= JSON.stringify(pinnedBooks) %>.includes(book._id.toString());
+                        const bookCard = `
+                            <div class="book-card" data-id="${book._id}">
+                                <div class="book-cover">
+                                    <img src="/thumbnail/${book._id}" alt="${book.title} cover" class="thumbnail" onerror="this.src='/images/default-thumbnail.png'">
+                                    <div class="pin-icon ${isPinned ? 'pinned' : ''}" data-book-id="${book._id}">
+                                        <span class="pin-count">${book.pinCount || 0}</span>
+                                        📌
+                                    </div>
+                                </div>
+                                <div class="book-info">
+                                    <h3>${book.title}</h3>
+                                    <p class="author">by ${book.author}</p>
+                                    <p class="owner">Shared by: ${book.uploadedBy ? book.uploadedBy.username : 'Unknown'}</p>
+                                    <p class="file-type">${book.fileType.toUpperCase()}</p>
+                                    <p class="visibility">
+                                        <span class="visibility-badge visibility-${book.visibility}">
+                                            ${book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1)}
+                                        </span>
+                                    </p>
+                                    <div class="book-actions">
+                                        <a href="/view/${book._id}" class="btn btn-primary">View</a>
+                                        <a href="/file/${book._id}" download="${book.fileName}" class="btn btn-secondary">Download</a>
+                                        ${book.visibility === 'restricted' && !book.accessList.includes('<%= currentUser %>') && !<%= JSON.stringify(pendingBookIds) %>.includes(book._id.toString()) ? `<button class="btn btn-secondary request-access" data-book-id="${book._id}">Request Access</button>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        booksContainer.innerHTML += bookCard;
+                    });
+                } catch (err) {
+                    console.error(`Search: Error for query="${query}":`, err);
+                    booksContainer.innerHTML = `
+                        <div class="empty-state">
+                            <p>Error searching books: ${err.message}</p>
+                        </div>
+                    `;
+                }
+            });
         });
-      });
-    });
-  </script>
+    </script>
 </body>
 </html>

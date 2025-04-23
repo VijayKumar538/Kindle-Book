@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account Settings - MyLibrary</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://kit.fontawesome.com/your-fontawesome-kit.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1><a href="/">MyLibrary</a></h1>
+      <nav>
+        <a href="/library">My Library</a>
+        <a href="/pinned">Pinned Books</a>
+        <a href="/explore">Explore</a>
+        <a href="/my-requests">My Requests</a>
+        <a href="/access-requests">Access Requests</a>
+        <a href="/upload">Upload</a>
+        <a href="/account" class="active">Account</a>
+        <a href="/logout">Logout</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <h2>Account Settings</h2>
+
+    <div class="account-grid">
+      <!-- Profile Card -->
+      <div class="account-card">
+        <div class="card-header">
+          <i class="fas fa-user"></i>
+          <h3>Profile</h3>
+        </div>
+        <div class="profile-info">
+          <div class="info-row">
+            <span class="info-label">Username:</span>
+            <span class="info-value"><%= user.username %></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Email:</span>
+            <span class="info-value"><%= user.email %></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Joined:</span>
+            <span class="info-value"><%= new Date(user.createdAt).toLocaleDateString() %></span>
+          </div>
+        </div>
+        <button id="editProfileBtn" class="btn btn-primary btn-block">Edit Profile</button>
+        <form id="editProfileForm" class="edit-form hidden" action="/account/update-profile" method="POST" enctype="multipart/form-data">
+          <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" value="<%= user.username %>" required>
+          </div>
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" value="<%= user.email %>" required>
+          </div>
+          <div class="form-group">
+            <label for="currentPassword">Current Password</label>
+            <input type="password" id="currentPassword" name="currentPassword" required>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="button" id="debugEditProfile" class="btn btn-secondary">Debug Data</button>
+            <button type="button" id="cancelEditProfile" class="btn btn-secondary">Cancel</button>
+          </div>
+        </form>
+        <div id="editProfileMessage" class="message"></div>
+      </div>
+
+      <!-- Storage Card -->
+      <div class="account-card">
+        <div class="card-header">
+          <i class="fas fa-hdd"></i>
+          <h3>Storage</h3>
+        </div>
+        <div class="storage-info">
+          <canvas id="storageChart" height="100"></canvas>
+          <div class="storage-details">
+            <p>Used: <%= storageUsedMB %> MB</p>
+            <p>Total: <%= storageLimitMB %> MB</p>
+            <p>Available: <%= (storageLimitMB - storageUsedMB).toFixed(1) %> MB</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Password Card -->
+      <div class="account-card">
+        <div class="card-header">
+          <i class="fas fa-lock"></i>
+          <h3>Password</h3>
+        </div>
+        <button id="changePasswordBtn" class="btn btn-primary btn-block">Change Password</button>
+        <form id="changePasswordForm" class="edit-form hidden" action="/account/update-password" method="POST" enctype="multipart/form-data">
+          <div class="form-group">
+            <label for="currentPasswordForPwd">Current Password</label>
+            <input type="password" id="currentPasswordForPwd" name="currentPassword" required>
+          </div>
+          <div class="form-group">
+            <label for="newPassword">New Password</label>
+            <input type="password" id="newPassword" name="newPassword" required>
+          </div>
+          <div class="form-group">
+            <label for="confirmPassword">Confirm Password</label>
+            <input type="password" id="confirmPassword" name="confirmPassword" required>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Update</button>
+            <button type="button" id="debugChangePassword" class="btn btn-secondary">Debug Data</button>
+            <button type="button" id="cancelChangePassword" class="btn btn-secondary">Cancel</button>
+          </div>
+        </form>
+        <div id="changePasswordMessage" class="message"></div>
+      </div>
+
+      <!-- Requests Card -->
+      <div class="account-card">
+        <div class="card-header">
+          <i class="fas fa-envelope"></i>
+          <h3>Requests</h3>
+        </div>
+        <div class="request-links">
+          <a href="/my-requests" class="btn btn-secondary btn-block">My Requests</a>
+          <a href="/access-requests" class="btn btn-secondary btn-block">Pending Requests</a>
+        </div>
+      </div>
+
+      <!-- Danger Zone Card -->
+      <div class="account-card danger-zone">
+        <div class="card-header">
+          <i class="fas fa-exclamation-triangle"></i>
+          <h3>Danger Zone</h3>
+        </div>
+        <button id="deleteAccountBtn" class="btn btn-danger btn-block">Delete Account</button>
+        <div id="deleteAccountConfirm" class="edit-form hidden">
+          <p class="warning-text">Warning: This action is permanent and will delete all your data.</p>
+          <form id="deleteAccountForm" action="/account/delete" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+              <label for="deletePassword">Password</label>
+              <input type="password" id="deletePassword" name="password" required>
+            </div>
+            <label class="confirm-text">
+              <input type="checkbox" id="confirmDelete" name="confirmDelete" required>
+              I understand this is permanent
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-danger">Delete Account</button>
+              <button type="button" id="cancelDeleteAccount" class="btn btn-secondary">Cancel</button>
+            </div>
+          </form>
+          <div id="deleteAccountMessage" class="message"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>© 2025 MyLibrary. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Toggle form visibility
+      document.getElementById('editProfileBtn').addEventListener('click', function() {
+        document.getElementById('editProfileForm').classList.toggle('hidden');
+        this.classList.toggle('hidden');
+      });
+      document.getElementById('cancelEditProfile').addEventListener('click', function() {
+        document.getElementById('editProfileForm').classList.add('hidden');
+        document.getElementById('editProfileBtn').classList.remove('hidden');
+        document.getElementById('editProfileMessage').textContent = '';
+      });
+
+      document.getElementById('changePasswordBtn').addEventListener('click', function() {
+        document.getElementById('changePasswordForm').classList.toggle('hidden');
+        this.classList.toggle('hidden');
+      });
+      document.getElementById('cancelChangePassword').addEventListener('click', function() {
+        document.getElementById('changePasswordForm').classList.add('hidden');
+        document.getElementById('changePasswordBtn').classList.remove('hidden');
+        document.getElementById('changePasswordMessage').textContent = '';
+      });
+
+      document.getElementById('deleteAccountBtn').addEventListener('click', function() {
+        document.getElementById('deleteAccountConfirm').classList.toggle('hidden');
+        this.classList.toggle('hidden');
+      });
+      document.getElementById('cancelDeleteAccount').addEventListener('click', function() {
+        document.getElementById('deleteAccountConfirm').classList.add('hidden');
+        document.getElementById('deleteAccountBtn').classList.remove('hidden');
+        document.getElementById('deleteAccountMessage').textContent = '';
+      });
+
+      // Debug form data
+      function debugFormData(formId, messageDivId) {
+        const form = document.getElementById(formId);
+        const messageDiv = document.getElementById(messageDivId);
+        const formData = new FormData(form);
+        const data = {};
+        for (const [key, value] of formData.entries()) {
+          data[key] = value;
+        }
+        console.log(`Debug ${formId} data:`, data);
+        messageDiv.className = 'message';
+        messageDiv.textContent = 'Check Console for form data';
+      }
+
+      document.getElementById('debugEditProfile').addEventListener('click', () => {
+        debugFormData('editProfileForm', 'editProfileMessage');
+      });
+      document.getElementById('debugChangePassword').addEventListener('click', () => {
+        debugFormData('changePasswordForm', 'changePasswordMessage');
+      });
+
+      // Handle form submissions
+      function handleFormSubmit(formId, messageDivId, successCallback) {
+        const form = document.getElementById(formId);
+        const messageDiv = document.getElementById(messageDivId);
+
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          messageDiv.textContent = '';
+          messageDiv.className = 'message';
+
+          // Use FormData
+          const formData = new FormData(form);
+          const data = {};
+          for (const [key, value] of formData.entries()) {
+            data[key] = value;
+          }
+          console.log(`Form ${formId} data:`, data);
+
+          // Client-side validation
+          const errors = [];
+          if (formId === 'editProfileForm') {
+            if (!data.username || data.username.trim() === '') errors.push('Username is required');
+            if (!data.email || data.email.trim() === '') errors.push('Email is required');
+            if (!data.currentPassword || data.currentPassword.trim() === '') errors.push('Current password is required');
+          } else if (formId === 'changePasswordForm') {
+            if (!data.currentPassword || data.currentPassword.trim() === '') errors.push('Current password is required');
+            if (!data.newPassword || data.newPassword.trim() === '') errors.push('New password is required');
+            if (!data.confirmPassword || data.confirmPassword.trim() === '') errors.push('Confirm password is required');
+          } else if (formId === 'deleteAccountForm') {
+            if (!data.password || data.password.trim() === '') errors.push('Password is required');
+            if (!data.confirmDelete) errors.push('Confirmation is required');
+          }
+
+          if (errors.length > 0) {
+            console.log(`Form ${formId} client validation errors:`, errors);
+            messageDiv.className = 'message error';
+            messageDiv.textContent = errors.join('\n');
+            return;
+          }
+
+          // AJAX submission
+          try {
+            const response = await fetch(form.action, {
+              method: 'POST',
+              body: formData,
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+              }
+            });
+            const result = await response.json();
+
+            if (result.success) {
+              messageDiv.className = 'message success';
+              messageDiv.textContent = result.message;
+              if (successCallback) {
+                successCallback(result);
+              }
+            } else {
+              messageDiv.className = 'message error';
+              messageDiv.textContent = result.message.split('; ').join('\n');
+            }
+          } catch (err) {
+            console.error(`Form ${formId} AJAX error:`, err);
+            messageDiv.className = 'message error';
+            messageDiv.textContent = 'AJAX submission failed. Submitting directly...';
+            // Fallback to direct form submission
+            setTimeout(() => {
+              form.submit();
+            }, 1000);
+          }
+        });
+      }
+
+      // Initialize form handlers
+      handleFormSubmit('editProfileForm', 'editProfileMessage', () => {
+        location.reload();
+      });
+      handleFormSubmit('changePasswordForm', 'changePasswordMessage', () => {
+        document.getElementById('changePasswordForm').reset();
+        document.getElementById('changePasswordForm').classList.add('hidden');
+        document.getElementById('changePasswordBtn').classList.remove('hidden');
+      });
+      handleFormSubmit('deleteAccountForm', 'deleteAccountMessage', (data) => {
+        if (data.redirect) {
+          setTimeout(() => {
+            window.location.href = data.redirect;
+          }, 1000);
+        }
+      });
+
+      // Clear messages on input focus
+      document.querySelectorAll('input').forEach(input => {
+        input.addEventListener('focus', () => {
+          document.querySelectorAll('.message').forEach(div => {
+            div.textContent = '';
+            div.className = 'message';
+          });
+        });
+      });
+
+      // Storage chart
+      const used = Number('<%= storageUsedMB %>') || 0;
+      const total = Number('<%= storageLimitMB %>') || 500;
+      const available = total - used;
+      const ctx = document.getElementById('storageChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Used', 'Available'],
+          datasets: [{
+            data: [used, available > 0 ? available : 0],
+            backgroundColor: ['#007bff', '#6c757d'],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              display: true,
+              position: 'bottom',
+              labels: {
+                font: { size: 12 },
+                color: '#333'
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.parsed || 0;
+                  return `${label}: ${value.toFixed(1)} MB`;
+                }
+              }
+            }
+          },
+          cutout: '70%'
+        }
+      });
+    });
+  </script>
+
+  <style>
+    .message {
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      text-align: center;
+      white-space: pre-line;
+    }
+    .message.success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .message.error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .edit-form input[type="text"],
+    .edit-form input[type="email"],
+    .edit-form input[type="password"] {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .storage-info canvas {
+      max-width: 150px;
+      margin: 0 auto 0.5rem;
+    }
+    .form-actions {
+      display: flex;
+      justify-content: space-between;
+    }
+    .btn {
+      cursor: pointer;
+    }
+  </style>
+</body>
+</html>
