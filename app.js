@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const path = require('path');
+const sanitizeHtml = require('sanitize-html');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -136,8 +137,6 @@ const requestSchema = new mongoose.Schema({
   requestDate: { type: Date, default: Date.now },
   responseDate: { type: Date }
 });
-
-const sanitizeHtml = require('sanitize-html');
 
 const noteSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -931,8 +930,6 @@ app.post('/account/delete', isAuthenticated, formUpload, async (req, res) => {
     });
   }
 });
-
-const sanitizeHtml = require('sanitize-html');
 
 app.post('/notes/save', isAuthenticated, async (req, res) => {
   try {
