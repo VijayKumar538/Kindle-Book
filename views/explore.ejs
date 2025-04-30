@@ -3,19 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Explore Books - MyLibrary</title>
+    <title>Explore Books - BookHive</title>
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
     <header>
         <div class="container">
-            <h1><a href="/">MyLibrary</a></h1>
+            <div class="logo-section">
+                <img src="/images/logo.jpg" alt="BookHive Logo" class="logo">
+              </div>
             <nav>
                 <a href="/library">My Library</a>
                 <a href="/pinned">Pinned Books</a>
                 <a href="/explore" class="active">Explore</a>
-                <a href="/my-requests">My Requests</a>
-                <a href="/access-requests">Access Requests</a>
+                <!-- <a href="/my-requests">My Requests</a>
+                <a href="/access-requests">Access Requests</a> -->
                 <a href="/upload">Upload</a>
                 <a href="/account">Account</a>
                 <a href="/logout">Logout</a>
@@ -31,8 +33,15 @@
             <form id="search-form">
                 <input type="text" id="search-input" placeholder="Search by title, author or tags">
                 <button type="submit" class="btn">Search</button>
-                <button type="button" id="debugBooks" class="btn btn-secondary">Debug Books</button>
+                <!-- <button type="button" id="debugBooks" class="btn btn-secondary">Debug Books</button> -->
             </form>
+        </div>
+
+        <div class="notes-container">
+            <div class="notes-toggle">✏️</div>
+            <div class="notes-area">
+              <div id="notesText" class="content-editable" contenteditable="true" placeholder="Write your notes here..."><%- note %></div>
+            </div>
         </div>
 
         <!-- Trending Books Section -->
@@ -52,8 +61,8 @@
                             <div class="book-info">
                                 <h3><%= book.title %></h3>
                                 <p class="author">by <%= book.author %></p>
-                                <p class="owner">Shared by: <%= book.uploadedBy ? book.uploadedBy.username : 'Unknown' %></p>
-                                <p class="file-type"><%= book.fileType.toUpperCase() %></p>
+                                <!-- <p class="owner">Shared by: <%= book.uploadedBy ? book.uploadedBy.username : 'Unknown' %></p> -->
+                                <!-- <p class="file-type"><%= book.fileType.toUpperCase() %></p> -->
                                 <p class="visibility">
                                     <span class="visibility-badge visibility-<%= book.visibility %>">
                                         <%= book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1) %>
@@ -61,7 +70,6 @@
                                 </p>
                                 <div class="book-actions">
                                     <a href="/view/<%= book._id %>" class="btn btn-primary">View</a>
-                                    <a href="/file/<%= book._id %>" download="<%= book.fileName %>" class="btn btn-secondary">Download</a>
                                     <% if (book.visibility === 'restricted' && !book.accessList.includes(currentUser) && !pendingBookIds.includes(book._id.toString())) { %>
                                         <button class="btn btn-secondary request-access" data-book-id="<%= book._id %>">Request Access</button>
                                     <% } %>
@@ -94,8 +102,8 @@
                             <div class="book-info">
                                 <h3><%= book.title %></h3>
                                 <p class="author">by <%= book.author %></p>
-                                <p class="owner">Shared by: <%= book.uploadedBy ? book.uploadedBy.username : 'Unknown' %></p>
-                                <p class="file-type"><%= book.fileType.toUpperCase() %></p>
+                                <!-- <p class="owner">Shared by: <%= book.uploadedBy ? book.uploadedBy.username : 'Unknown' %></p> -->
+                                <!-- <p class="file-type"><%= book.fileType.toUpperCase() %></p> -->
                                 <p class="visibility">
                                     <span class="visibility-badge visibility-<%= book.visibility %>">
                                         <%= book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1) %>
@@ -103,7 +111,6 @@
                                 </p>
                                 <div class="book-actions">
                                     <a href="/view/<%= book._id %>" class="btn btn-primary">View</a>
-                                    <a href="/file/<%= book._id %>" download="<%= book.fileName %>" class="btn btn-secondary">Download</a>
                                     <% if (book.visibility === 'restricted' && !book.accessList.includes(currentUser) && !pendingBookIds.includes(book._id.toString())) { %>
                                         <button class="btn btn-secondary request-access" data-book-id="<%= book._id %>">Request Access</button>
                                     <% } %>
@@ -122,30 +129,62 @@
     
     <footer>
         <div class="container">
-            <p>© 2025 MyLibrary. All rights reserved.</p>
+            <p>© 2025 BookHive. All rights reserved.</p>
         </div>
     </footer>
     
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            const notesToggle = document.querySelector('.notes-toggle');
+            const notesArea = document.querySelector('.notes-area');
+            const notesText = document.getElementById('notesText');
+            let typingTimer;
+
+            notesToggle.addEventListener('click', () => {
+                const isVisible = notesArea.style.display === 'block';
+                notesArea.style.display = isVisible ? 'none' : 'block';
+            });
+
+            notesText.addEventListener('input', () => {
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(saveNotes, 1000);
+            });
+
+            async function saveNotes() {
+                const content = notesText.innerHTML; // Use innerHTML to capture bold tags
+                try {
+                const response = await fetch('/notes/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content })
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    console.error('Failed to save note:', data.message);
+                }
+                } catch (err) {
+                console.error('Error saving note:', err);
+                }
+            }
+
             const booksContainer = document.getElementById('books-container');
             const trendingBooksContainer = document.getElementById('trending-books-container');
             const searchForm = document.getElementById('search-form');
             const searchInput = document.getElementById('search-input');
-            const debugBooksBtn = document.getElementById('debugBooks');
+            // const debugBooksBtn = document.getElementById('debugBooks');
 
             // Debug button to log book data
-            debugBooksBtn.addEventListener('click', () => {
-                const books = Array.from(document.querySelectorAll('.book-card')).map(card => ({
-                    id: card.dataset.id,
-                    title: card.querySelector('h3').textContent,
-                    author: card.querySelector('.author').textContent,
-                    pinCount: card.querySelector('.pin-count').textContent,
-                    isPinned: card.querySelector('.pin-icon').classList.contains('pinned')
-                }));
-                console.log('Explore Books Data:', books);
-                alert('Book data logged to Console');
-            });
+            // debugBooksBtn.addEventListener('click', () => {
+            //     const books = Array.from(document.querySelectorAll('.book-card')).map(card => ({
+            //         id: card.dataset.id,
+            //         title: card.querySelector('h3').textContent,
+            //         author: card.querySelector('.author').textContent,
+            //         pinCount: card.querySelector('.pin-count').textContent,
+            //         isPinned: card.querySelector('.pin-icon').classList.contains('pinned')
+            //     }));
+            //     console.log('Explore Books Data:', books);
+            //     alert('Book data logged to Console');
+            // });
 
             // Check session status
             async function checkSession() {
@@ -327,8 +366,6 @@
                                 <div class="book-info">
                                     <h3>${book.title}</h3>
                                     <p class="author">by ${book.author}</p>
-                                    <p class="owner">Shared by: ${book.uploadedBy ? book.uploadedBy.username : 'Unknown'}</p>
-                                    <p class="file-type">${book.fileType.toUpperCase()}</p>
                                     <p class="visibility">
                                         <span class="visibility-badge visibility-${book.visibility}">
                                             ${book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1)}
@@ -336,7 +373,6 @@
                                     </p>
                                     <div class="book-actions">
                                         <a href="/view/${book._id}" class="btn btn-primary">View</a>
-                                        <a href="/file/${book._id}" download="${book.fileName}" class="btn btn-secondary">Download</a>
                                         ${book.visibility === 'restricted' && !book.accessList.includes('<%= currentUser %>') && !<%= JSON.stringify(pendingBookIds) %>.includes(book._id.toString()) ? `<button class="btn btn-secondary request-access" data-book-id="${book._id}">Request Access</button>` : ''}
                                     </div>
                                 </div>

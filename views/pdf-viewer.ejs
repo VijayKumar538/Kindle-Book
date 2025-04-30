@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= book.title %> - PDF Viewer - Kindle Clone</title>
+    <title><%= book.title %> - PDF Viewer - BookHive</title>
     <link rel="stylesheet" href="/css/style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/js/all.min.js"></script>
@@ -148,9 +148,17 @@
 </head>
 <body>
     <div class="container">
+        <div class="notes-container">
+            <div class="notes-toggle">✏️</div>
+            <div class="notes-area">
+              <div id="notesText" class="content-editable" contenteditable="true" placeholder="Write your notes here..."><%- note %></div>
+            </div>
+        </div>
         <nav class="main-nav">
             <div class="nav-logo">
-                <a href="/">Kindle Clone</a>
+                <div class="logo-section">
+                    <img src="/images/logo.jpg" alt="BookHive Logo" class="logo">
+                </div>
             </div>
             <ul class="nav-links">
                 <li><a href="/library">My Library</a></li>
@@ -187,9 +195,9 @@
                             <i class="fas fa-search-plus"></i>
                         </button>
                     </div>
-                    <a href="/file/<%= book._id %>" download="<%= book.fileName %>" class="toolbar-button" title="Download">
+                    <!-- <a href="/file/<%= book._id %>" download="<%= book.fileName %>" class="toolbar-button" title="Download">
                         <i class="fas fa-download"></i> Download
-                    </a>
+                    </a> -->
                     <button id="toggleFullscreen" class="toolbar-button" title="Fullscreen">
                         <i class="fas fa-expand"></i>
                     </button>
@@ -209,6 +217,37 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const notesToggle = document.querySelector('.notes-toggle');
+            const notesArea = document.querySelector('.notes-area');
+            const notesText = document.getElementById('notesText');
+            let typingTimer;
+
+            notesToggle.addEventListener('click', () => {
+                const isVisible = notesArea.style.display === 'block';
+                notesArea.style.display = isVisible ? 'none' : 'block';
+            });
+
+            notesText.addEventListener('input', () => {
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(saveNotes, 1000);
+            });
+
+            async function saveNotes() {
+                const content = notesText.innerHTML; // Use innerHTML to capture bold tags
+                try {
+                const response = await fetch('/notes/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content })
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    console.error('Failed to save note:', data.message);
+                }
+                } catch (err) {
+                console.error('Error saving note:', err);
+                }
+            }
             // Set up PDF.js
             const pdfjsLib = window['pdfjs-dist/build/pdf'];
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.worker.min.js';

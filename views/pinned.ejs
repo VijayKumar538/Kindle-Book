@@ -3,19 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pinned Books - MyLibrary</title>
+    <title>Pinned Books - BookHive</title>
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
     <header>
         <div class="container">
-            <h1><a href="/">MyLibrary</a></h1>
+            <div class="logo-section">
+                <img src="/images/logo.jpg" alt="BookHive Logo" class="logo">
+            </div>
             <nav>
                 <a href="/library">My Library</a>
                 <a href="/pinned" class="active">Pinned Books</a>
                 <a href="/explore">Explore</a>
-                <a href="/my-requests">My Requests</a>
-                <a href="/access-requests">Access Requests</a>
+                <!-- <a href="/my-requests">My Requests</a>
+                <a href="/access-requests">Access Requests</a> -->
                 <a href="/upload">Upload</a>
                 <a href="/account">Account</a>
                 <a href="/logout">Logout</a>
@@ -35,6 +37,14 @@
             </form>
         </div>
 
+        <!-- Notes functionality -->
+        <div class="notes-container">
+            <div class="notes-toggle">✏️</div>
+            <div class="notes-area">
+                <div id="notesText" class="content-editable" contenteditable="true" placeholder="Write your notes here..."><%- typeof note !== 'undefined' ? note : '' %></div>
+            </div>
+        </div>
+
         <!-- Pinned Books Section -->
         <section class="pinned-books">
             <h3>All Pinned Books</h3>
@@ -52,8 +62,8 @@
                             <div class="book-info">
                                 <h3><%= book.title %></h3>
                                 <p class="author">by <%= book.author %></p>
-                                <p class="owner">Shared by: <%= book.uploadedBy && book.uploadedBy.toString() === user._id.toString() ? 'You' : (book.uploadedBy ? book.uploadedBy.username : 'Unknown') %></p>
-                                <p class="file-type"><%= book.fileType.toUpperCase() %></p>
+                                <!-- <p class="owner">Shared by: <%= book.uploadedBy && book.uploadedBy.toString() === user._id.toString() ? 'You' : (book.uploadedBy ? book.uploadedBy.username : 'Unknown') %></p> -->
+                                <!-- <p class="file-type"><%= book.fileType.toUpperCase() %></p> -->
                                 <p class="visibility">
                                     <span class="visibility-badge visibility-<%= book.visibility %>">
                                         <%= book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1) %>
@@ -61,7 +71,7 @@
                                 </p>
                                 <div class="book-actions">
                                     <a href="/view/<%= book._id %>" class="btn btn-primary">View</a>
-                                    <a href="/file/<%= book._id %>" download="<%= book.fileName %>" class="btn btn-secondary">Download</a>
+                                    <!-- <a href="/file/<%= book._id %>" download="<%= book.fileName %>" class="btn btn-secondary">Download</a> -->
                                 </div>
                             </div>
                         </div>
@@ -77,12 +87,45 @@
     
     <footer>
         <div class="container">
-            <p>© 2025 MyLibrary. All rights reserved.</p>
+            <p>© 2025 BookHive. All rights reserved.</p>
         </div>
     </footer>
     
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // Notes functionality
+            const notesToggle = document.querySelector('.notes-toggle');
+            const notesArea = document.querySelector('.notes-area');
+            const notesText = document.getElementById('notesText');
+            let typingTimer;
+
+            notesToggle.addEventListener('click', () => {
+                const isVisible = notesArea.style.display === 'block';
+                notesArea.style.display = isVisible ? 'none' : 'block';
+            });
+
+            notesText.addEventListener('input', () => {
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(saveNotes, 1000);
+            });
+
+            async function saveNotes() {
+                const content = notesText.innerHTML; // Use innerHTML to capture bold tags
+                try {
+                    const response = await fetch('/notes/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content })
+                    });
+                    const data = await response.json();
+                    if (!data.success) {
+                        console.error('Failed to save note:', data.message);
+                    }
+                } catch (err) {
+                    console.error('Error saving note:', err);
+                }
+            }
+
             const booksContainer = document.getElementById('books-container');
             const searchForm = document.getElementById('search-form');
             const searchInput = document.getElementById('search-input');
@@ -245,8 +288,6 @@
                                 <div class="book-info">
                                     <h3>${book.title}</h3>
                                     <p class="author">by ${book.author}</p>
-                                    <p class="owner">Shared by: ${book.uploadedBy && book.uploadedBy.toString() === '<%= user._id %>' ? 'You' : (book.uploadedBy ? book.uploadedBy.username : 'Unknown')}</p>
-                                    <p class="file-type">${book.fileType.toUpperCase()}</p>
                                     <p class="visibility">
                                         <span class="visibility-badge visibility-${book.visibility}">
                                             ${book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1)}
@@ -254,7 +295,6 @@
                                     </p>
                                     <div class="book-actions">
                                         <a href="/view/${book._id}" class="btn btn-primary">View</a>
-                                        <a href="/file/${book._id}" download="${book.fileName}" class="btn btn-secondary">Download</a>
                                     </div>
                                 </div>
                             </div>

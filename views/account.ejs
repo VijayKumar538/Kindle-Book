@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Account Settings - MyLibrary</title>
+  <title>Account Settings - BookHive</title>
   <link rel="stylesheet" href="/css/style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://kit.fontawesome.com/your-fontawesome-kit.js" crossorigin="anonymous"></script>
@@ -11,13 +11,15 @@
 <body>
   <header>
     <div class="container">
-      <h1><a href="/">MyLibrary</a></h1>
+      <div class="logo-section">
+        <img src="/images/logo.jpg" alt="BookHive Logo" class="logo">
+      </div>
       <nav>
         <a href="/library">My Library</a>
         <a href="/pinned">Pinned Books</a>
         <a href="/explore">Explore</a>
-        <a href="/my-requests">My Requests</a>
-        <a href="/access-requests">Access Requests</a>
+        <!-- <a href="/my-requests">My Requests</a>
+        <a href="/access-requests">Access Requests</a> -->
         <a href="/upload">Upload</a>
         <a href="/account" class="active">Account</a>
         <a href="/logout">Logout</a>
@@ -27,6 +29,13 @@
 
   <main class="container">
     <h2>Account Settings</h2>
+
+    <div class="notes-container">
+      <div class="notes-toggle">✏️</div>
+      <div class="notes-area">
+        <div id="notesText" class="content-editable" contenteditable="true" placeholder="Write your notes here..."><%- note %></div>
+      </div>
+    </div>
 
     <div class="account-grid">
       <!-- Profile Card -->
@@ -160,12 +169,43 @@
 
   <footer>
     <div class="container">
-      <p>© 2025 MyLibrary. All rights reserved.</p>
+      <p>© 2025 BookHive. All rights reserved.</p>
     </div>
   </footer>
 
   <script>
     document.addEventListener('DOMContentLoaded', function() {
+      const notesToggle = document.querySelector('.notes-toggle');
+      const notesArea = document.querySelector('.notes-area');
+      const notesText = document.getElementById('notesText');
+      let typingTimer;
+
+      notesToggle.addEventListener('click', () => {
+        const isVisible = notesArea.style.display === 'block';
+        notesArea.style.display = isVisible ? 'none' : 'block';
+      });
+
+      notesText.addEventListener('input', () => {
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(saveNotes, 1000);
+      });
+
+      async function saveNotes() {
+        const content = notesText.innerHTML; // Use innerHTML to capture bold tags
+        try {
+          const response = await fetch('/notes/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content })
+          });
+          const data = await response.json();
+          if (!data.success) {
+            console.error('Failed to save note:', data.message);
+          }
+        } catch (err) {
+          console.error('Error saving note:', err);
+        }
+      }
       // Toggle form visibility
       document.getElementById('editProfileBtn').addEventListener('click', function() {
         document.getElementById('editProfileForm').classList.toggle('hidden');

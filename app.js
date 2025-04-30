@@ -60,6 +60,23 @@ const formUpload = multer({
   }
 }).none(); // Expect no files, only fields
 
+// Middleware to fetch user and note
+const fetchUserAndNote = async (req, res, next) => {
+  if (req.session.userId) {
+    try {
+      req.user = await User.findById(req.session.userId);
+      req.note = await Note.findOne({ user: req.session.userId });
+    } catch (err) {
+      console.error('Error fetching user or note:', err);
+      req.user = null;
+      req.note = null;
+    }
+  }
+  next();
+};
+
+app.use(fetchUserAndNote);
+
 // Connect to MongoDB
 mongoose.connect('mongodb://localhost:27017/MyLibrary', { 
   useNewUrlParser: true, 
@@ -120,10 +137,19 @@ const requestSchema = new mongoose.Schema({
   responseDate: { type: Date }
 });
 
+const sanitizeHtml = require('sanitize-html');
+
+const noteSchema = new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  content: { type: String, default: '' },
+  updatedAt: { type: Date, default: Date.now }
+});
+
 // Models
 const User = mongoose.model('User', userSchema);
 const Book = mongoose.model('Book', bookSchema);
 const Request = mongoose.model('Request', requestSchema);
+const Note = mongoose.model('Note', noteSchema);
 
 // Configure multer for file uploads (PDFs)
 const upload = multer({
@@ -156,83 +182,31 @@ const isAuthenticated = (req, res, next) => {
 // Error handling middleware for multer
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    return res.status(400).render('upload', { error: err.message });
+    return res.status(400).render('upload', { error: err.message, user: req.user, note: req.note ? req.note.content : '' });
   } else if (err) {
-    return res.status(400).render('upload', { error: err.message });
+    return res.status(400).render('upload', { error: err.message, user: req.user, note: req.note ? req.note.content : '' });
   }
   next();
 });
 
 // Routes
 app.get('/', (req, res) => {
-  res.render('index', { user: req.session.userId });
-});
-
-// Search functionality in library
-app.get('/library/search', isAuthenticated, async (req, res) => {
-  try {
-    const { query } = req.query;
-    const searchRegex = new RegExp(query, 'i');
-    const books = await Book.find({
-      uploadedBy: req.session.userId,
-      $or: [
-        { title: searchRegex },
-        { author: searchRegex },
-        { tags: searchRegex }
-      ]
-    });
-    res.json({ books });
-  } catch (err) {
-    console.error('Search error:', err);
-    res.status(500).json({ success: false, message: 'Failed to search books' });
-  }
-});
-
-// Search functionality in explore
-app.get('/explore/search', isAuthenticated, async (req, res) => {
-  try {
-    const { query } = req.query;
-    const searchRegex = new RegExp(query, 'i');
-    const publicBooks = await Book.find({
-      visibility: 'public',
-      uploadedBy: { $ne: req.session.userId },
-      $or: [
-        { title: searchRegex },
-        { author: searchRegex },
-        { tags: searchRegex }
-      ]
-    }).populate('uploadedBy', 'username');
-    const accessibleBooks = await Book.find({
-      visibility: 'restricted',
-      accessList: req.session.userId,
-      uploadedBy: { $ne: req.session.userId },
-      $or: [
-        { title: searchRegex },
-        { author: searchRegex },
-        { tags: searchRegex }
-      ]
-    }).populate('uploadedBy', 'username');
-    const books = [...publicBooks, ...accessibleBooks];
-    res.json({ books });
-  } catch (err) {
-    console.error('Search error:', err);
-    res.status(500).json({ success: false, message: 'Failed to search books' });
-  }
+  res.render('index', { user: req.user, note: req.note ? req.note.content : '' });
 });
 
 app.get('/signup', (req, res) => {
-  res.render('signup');
+  res.render('signup', { user: req.user, note: req.note ? req.note.content : '' });
 });
 
 app.post('/signup', async (req, res) => {
   try {
     const { username, email, password } = req.body;
     if (!username || !email || !password) {
-      return res.status(400).render('signup', { error: 'All fields are required' });
+      return res.status(400).render('signup', { error: 'All fields are required', user: req.user, note: req.note ? req.note.content : '' });
     }
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
-      return res.status(400).render('signup', { error: 'User already exists' });
+      return res.status(400).render('signup', { error: 'User already exists', user: req.user, note: req.note ? req.note.content : '' });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = new User({
@@ -241,36 +215,42 @@ app.post('/signup', async (req, res) => {
       password: hashedPassword
     });
     await newUser.save();
+    // Create a note document for the new user
+    const newNote = new Note({
+      user: newUser._id,
+      content: ''
+    });
+    await newNote.save();
     res.redirect('/login');
   } catch (err) {
     console.error('Signup error:', err);
-    res.status(500).render('signup', { error: 'Server error' });
+    res.status(500).render('signup', { error: 'Server error', user: req.user, note: req.note ? req.note.content : '' });
   }
 });
 
 app.get('/login', (req, res) => {
-  res.render('login');
+  res.render('login', { user: req.user, note: req.note ? req.note.content : '' });
 });
 
 app.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
-      return res.status(400).render('login', { error: 'Email and password are required' });
+      return res.status(400).render('login', { error: 'Email and password are required', user: req.user, note: req.note ? req.note.content : '' });
     }
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).render('login', { error: 'Invalid credentials' });
+      return res.status(400).render('login', { error: 'Invalid credentials', user: req.user, note: req.note ? req.note.content : '' });
     }
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(400).render('login', { error: 'Invalid credentials' });
+      return res.status(400).render('login', { error: 'Invalid credentials', user: req.user, note: req.note ? req.note.content : '' });
     }
     req.session.userId = user._id;
     res.redirect('/library');
   } catch (err) {
     console.error('Login error:', err);
-    res.status(500).render('login', { error: 'Server error' });
+    res.status(500).render('login', { error: 'Server error', user: req.user, note: req.note ? req.note.content : '' });
   }
 });
 
@@ -282,116 +262,90 @@ app.get('/logout', (req, res) => {
 
 app.get('/library', isAuthenticated, async (req, res) => {
   try {
-    const user = await User.findById(req.session.userId);
+    const user = req.user;
     const books = await Book.find({ uploadedBy: req.session.userId });
     res.render('library', { 
       books, 
       user,
-      pinnedBooks: user.pinnedBooks
+      pinnedBooks: user.pinnedBooks,
+      note: req.note ? req.note.content : ''
     });
   } catch (err) {
     console.error('Library error:', err);
-    res.status(500).render('error', { message: 'Failed to load your library' });
+    res.status(500).render('error', { message: 'Failed to load your library', user: req.user, note: req.note ? req.note.content : '' });
   }
 });
 
 app.get('/pinned', isAuthenticated, async (req, res) => {
   try {
-    const user = await User.findById(req.session.userId).populate('pinnedBooks');
+    const user = req.user;
+    await user.populate('pinnedBooks'); // Populate pinnedBooks
     res.render('pinned', { 
       pinnedBooks: user.pinnedBooks,
-      user
+      user,
+      note: req.note ? req.note.content : ''
     });
   } catch (err) {
     console.error('Pinned books error:', err);
-    res.status(500).render('error', { message: 'Failed to load your pinned books' });
+    res.status(500).render('error', { message: 'Failed to load your pinned books', user: req.user, note: req.note ? req.note.content : '' });
   }
 });
 
-// // Pin/unpin a book
-// app.post('/book/:bookId/pin', isAuthenticated, async (req, res) => {
-//   try {
-//     const bookId = req.params.bookId;
-//     const user = await User.findById(req.session.userId);
-//     const book = await Book.findById(bookId);
-//     if (!book) {
-//       return res.status(404).json({ success: false, message: 'Book not found' });
-//     }
-//     const isPinned = user.pinnedBooks.includes(bookId);
-//     if (isPinned) {
-//       user.pinnedBooks = user.pinnedBooks.filter(id => id.toString() !== bookId);
-//       book.pinCount = Math.max(0, book.pinCount - 1);
-//     } else {
-//       user.pinnedBooks.push(bookId);
-//       book.pinCount = (book.pinCount || 0) + 1;
-//     }
-//     await user.save();
-//     await book.save();
-//     res.json({ 
-//       success: true, 
-//       isPinned: !isPinned,
-//       pinCount: book.pinCount
-//     });
-//   } catch (err) {
-//     console.error('Pin/unpin error:', err);
-//     res.status(500).json({ success: false, message: 'Failed to update pin status' });
-//   }
-// });
-
 app.post('/book/:bookId/pin', isAuthenticated, async (req, res) => {
-    try {
-        const bookId = req.params.bookId;
-        const user = await User.findById(req.session.userId);
-        const book = await Book.findById(bookId);
-        if (!book) {
-            return res.status(404).json({ success: false, message: 'Book not found' });
-        }
-        const isPinned = user.pinnedBooks.includes(bookId);
-        if (isPinned) {
-            user.pinnedBooks = user.pinnedBooks.filter(id => id.toString() !== bookId);
-            book.pinCount = Math.max(0, book.pinCount - 1);
-        } else {
-            user.pinnedBooks.push(bookId);
-            book.pinCount = (book.pinCount || 0) + 1;
-        }
-        await user.save();
-        await book.save();
-        res.json({ 
-            success: true, 
-            isPinned: !isPinned,
-            pinCount: book.pinCount
-        });
-    } catch (err) {
-        console.error('Pin/unpin error:', err);
-        res.status(500).json({ success: false, message: 'Failed to update pin status' });
+  try {
+    const bookId = req.params.bookId;
+    const user = await User.findById(req.session.userId);
+    const book = await Book.findById(bookId);
+    if (!book) {
+      return res.status(404).json({ success: false, message: 'Book not found' });
     }
+    const isPinned = user.pinnedBooks.includes(bookId);
+    if (isPinned) {
+      user.pinnedBooks = user.pinnedBooks.filter(id => id.toString() !== bookId);
+      book.pinCount = Math.max(0, book.pinCount - 1);
+    } else {
+      user.pinnedBooks.push(bookId);
+      book.pinCount = (book.pinCount || 0) + 1;
+    }
+    await user.save();
+    await book.save();
+    res.json({ 
+      success: true, 
+      isPinned: !isPinned,
+      pinCount: book.pinCount
+    });
+  } catch (err) {
+    console.error('Pin/unpin error:', err);
+    res.status(500).json({ success: false, message: 'Failed to update pin status' });
+  }
 });
 
 app.get('/upload', isAuthenticated, (req, res) => {
-  res.render('upload');
+  res.render('upload', { user: req.user, note: req.note ? req.note.content : '' });
 });
 
-// Upload route for PDF files
 app.post('/upload', isAuthenticated, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).render('upload', { error: 'Please upload a file' });
+      return res.status(400).render('upload', { error: 'Please upload a file', user: req.user, note: req.note ? req.note.content : '' });
     }
     const { title, author, visibility, description, tags } = req.body;
     const tagArray = tags ? tags.split(',').map(tag => tag.trim()) : [];
     if (!['private', 'public', 'restricted'].includes(visibility)) {
-      return res.status(400).render('upload', { error: 'Invalid visibility option' });
+      return res.status(400).render('upload', { error: 'Invalid visibility option', user: req.user, note: req.note ? req.note.content : '' });
     }
     const user = await User.findById(req.session.userId);
     const fileSize = req.file.size;
     if (user.storageUsed + fileSize > user.storageLimit) {
       return res.status(400).render('upload', { 
-        error: 'You have exceeded your storage limit. Please delete some files or upgrade your plan.' 
+        error: 'You have exceeded your storage limit. Please delete some files or upgrade your plan.',
+        user: req.user,
+        note: req.note ? req.note.content : ''
       });
     }
     const fileType = getFileTypeFromMime(req.file.mimetype);
     if (!fileType) {
-      return res.status(400).render('upload', { error: 'Only PDF files are allowed' });
+      return res.status(400).render('upload', { error: 'Only PDF files are allowed', user: req.user, note: req.note ? req.note.content : '' });
     }
     const newBook = new Book({
       title,
@@ -412,31 +366,29 @@ app.post('/upload', isAuthenticated, upload.single('file'), async (req, res) => 
     res.redirect('/library');
   } catch (err) {
     console.error('Upload error:', err);
-    res.status(500).render('upload', { error: 'Failed to upload file' });
+    res.status(500).render('upload', { error: 'Failed to upload file', user: req.user, note: req.note ? req.note.content : '' });
   }
 });
 
-// View/Read file
 app.get('/view/:bookId', isAuthenticated, async (req, res) => {
   try {
     const book = await Book.findById(req.params.bookId);
     if (!book) {
-      return res.status(400).render('error', { message: 'Book not found' });
+      return res.status(400).render('error', { message: 'Book not found', user: req.user, note: req.note ? req.note.content : '' });
     }
     const isOwner = book.uploadedBy.toString() === req.session.userId;
     const hasAccess = book.accessList.includes(req.session.userId);
     const isPublic = book.visibility === 'public';
     if (!isOwner && !isPublic && !hasAccess) {
-      return res.status(403).render('error', { message: 'You do not have access to this file' });
+      return res.status(403).render('error', { message: 'You do not have access to this file', user: req.user, note: req.note ? req.note.content : '' });
     }
-    res.render('pdf-viewer', { book });
+    res.render('pdf-viewer', { book, user: req.user, note: req.note ? req.note.content : '' });
   } catch (err) {
     console.error('View error:', err);
-    res.status(500).render('error', { message: 'Failed to load file' });
+    res.status(500).render('error', { message: 'Failed to load file', user: req.user, note: req.note ? req.note.content : '' });
   }
 });
 
-// Direct file access
 app.get('/file/:bookId', isAuthenticated, async (req, res) => {
   try {
     const book = await Book.findById(req.params.bookId);
@@ -460,7 +412,6 @@ app.get('/file/:bookId', isAuthenticated, async (req, res) => {
   }
 });
 
-// Get book thumbnail
 app.get('/thumbnail/:bookId', async (req, res) => {
   try {
     const book = await Book.findById(req.params.bookId);
@@ -483,7 +434,6 @@ app.get('/thumbnail/:bookId', async (req, res) => {
   }
 });
 
-// Delete book
 app.delete('/book/:id', isAuthenticated, async (req, res) => {
   try {
     const book = await Book.findOne({ _id: req.params.id, uploadedBy: req.session.userId });
@@ -505,7 +455,6 @@ app.delete('/book/:id', isAuthenticated, async (req, res) => {
   }
 });
 
-// Update book visibility
 app.put('/book/:bookId/visibility', isAuthenticated, async (req, res) => {
   try {
     const { visibility } = req.body;
@@ -531,7 +480,6 @@ app.put('/book/:bookId/visibility', isAuthenticated, async (req, res) => {
   }
 });
 
-// Get users with access to a book
 app.get('/book/:bookId/access-list', isAuthenticated, async (req, res) => {
   try {
     const book = await Book.findById(req.params.bookId);
@@ -551,7 +499,6 @@ app.get('/book/:bookId/access-list', isAuthenticated, async (req, res) => {
   }
 });
 
-// Remove user access
 app.delete('/book/:bookId/access/:userId', isAuthenticated, async (req, res) => {
   try {
     const book = await Book.findById(req.params.bookId);
@@ -573,10 +520,9 @@ app.delete('/book/:bookId/access/:userId', isAuthenticated, async (req, res) => 
   }
 });
 
-// Explore public books
 app.get('/explore', isAuthenticated, async (req, res) => {
   try {
-    const user = await User.findById(req.session.userId);
+    const user = req.user;
     const publicBooks = await Book.find({
       visibility: 'public',
       uploadedBy: { $ne: req.session.userId }
@@ -604,28 +550,27 @@ app.get('/explore', isAuthenticated, async (req, res) => {
       pendingBookIds,
       currentUser: req.session.userId,
       user,
-      pinnedBooks: user.pinnedBooks.map(id => id.toString())
+      pinnedBooks: user.pinnedBooks.map(id => id.toString()),
+      note: req.note ? req.note.content : ''
     });
   } catch (err) {
     console.error('Explore error:', err);
-    res.status(500).render('error', { message: 'Failed to load public books' });
+    res.status(500).render('error', { message: 'Failed to load public books', user: req.user, note: req.note ? req.note.content : '' });
   }
 });
 
-// Show all requests
 app.get('/my-requests', isAuthenticated, async (req, res) => {
   try {
     const sentRequests = await Request.find({ requestedBy: req.session.userId })
       .populate('book', 'title author')
       .populate('bookOwner', 'username');
-    res.render('my-requests', { requests: sentRequests });
+    res.render('my-requests', { requests: sentRequests, user: req.user, note: req.note ? req.note.content : '' });
   } catch (err) {
     console.error('My requests error:', err);
-    res.status(500).render('error', { message: 'Failed to load requests' });
+    res.status(500).render('error', { message: 'Failed to load requests', user: req.user, note: req.note ? req.note.content : '' });
   }
 });
 
-// Access requests management page
 app.get('/access-requests', isAuthenticated, async (req, res) => {
   try {
     const receivedRequests = await Request.find({ 
@@ -634,14 +579,13 @@ app.get('/access-requests', isAuthenticated, async (req, res) => {
     })
       .populate('book', 'title author')
       .populate('requestedBy', 'username email');
-    res.render('access-requests', { requests: receivedRequests });
+    res.render('access-requests', { requests: receivedRequests, user: req.user, note: req.note ? req.note.content : '' });
   } catch (err) {
     console.error('Access requests error:', err);
-    res.status(500).render('error', { message: 'Failed to load access requests' });
+    res.status(500).render('error', { message: 'Failed to load access requests', user: req.user, note: req.note ? req.note.content : '' });
   }
 });
 
-// Request access to a book
 app.post('/request-access/:bookId', isAuthenticated, async (req, res) => {
   try {
     const book = await Book.findById(req.params.bookId);
@@ -669,7 +613,6 @@ app.post('/request-access/:bookId', isAuthenticated, async (req, res) => {
   }
 });
 
-// Handle access request (approve/decline)
 app.post('/handle-request/:requestId', isAuthenticated, async (req, res) => {
   try {
     const { action } = req.body;
@@ -701,10 +644,9 @@ app.post('/handle-request/:requestId', isAuthenticated, async (req, res) => {
   }
 });
 
-// Account settings page
 app.get('/account', isAuthenticated, async (req, res) => {
   try {
-    const user = await User.findById(req.session.userId);
+    const user = req.user;
     const storageUsedMB = Math.round(user.storageUsed / (1024 * 1024) * 10) / 10;
     const storageLimitMB = Math.round(user.storageLimit / (1024 * 1024));
     const storagePercentage = Math.round((user.storageUsed / user.storageLimit) * 100);
@@ -714,15 +656,15 @@ app.get('/account', isAuthenticated, async (req, res) => {
       storageLimitMB, 
       storagePercentage,
       error: null,
-      success: null
+      success: null,
+      note: req.note ? req.note.content : ''
     });
   } catch (err) {
     console.error('Account settings error:', err);
-    res.status(500).render('error', { message: 'Failed to load account settings' });
+    res.status(500).render('error', { message: 'Failed to load account settings', user: req.user, note: req.note ? req.note.content : '' });
   }
 });
 
-// Get user's storage information
 app.get('/account/storage-info', isAuthenticated, async (req, res) => {
   try {
     const user = await User.findById(req.session.userId).select('storageUsed storageLimit');
@@ -744,13 +686,11 @@ app.get('/account/storage-info', isAuthenticated, async (req, res) => {
   }
 });
 
-// Update profile
 app.post('/account/update-profile', isAuthenticated, formUpload, async (req, res) => {
   try {
     console.log('Raw req.body:', req.body);
     const { username, email, currentPassword } = req.body;
 
-    // Validate fields
     const errors = [];
     if (!username || username.trim() === '') errors.push('Username is required');
     if (!email || email.trim() === '') errors.push('Email is required');
@@ -768,7 +708,8 @@ app.post('/account/update-profile', isAuthenticated, formUpload, async (req, res
         storageLimitMB: user.storageLimit / (1024 * 1024),
         storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
         error: errors.join('; '),
-        success: null
+        success: null,
+        note: req.note ? req.note.content : ''
       });
     }
 
@@ -785,7 +726,8 @@ app.post('/account/update-profile', isAuthenticated, formUpload, async (req, res
         storageLimitMB: user.storageLimit / (1024 * 1024),
         storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
         error: 'Incorrect current password',
-        success: null
+        success: null,
+        note: req.note ? req.note.content : ''
       });
     }
 
@@ -804,7 +746,8 @@ app.post('/account/update-profile', isAuthenticated, formUpload, async (req, res
         storageLimitMB: user.storageLimit / (1024 * 1024),
         storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
         error: 'Username or email already taken',
-        success: null
+        success: null,
+        note: req.note ? req.note.content : ''
       });
     }
 
@@ -828,12 +771,12 @@ app.post('/account/update-profile', isAuthenticated, formUpload, async (req, res
       storageLimitMB: user.storageLimit / (1024 * 1024),
       storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
       error: 'Server error',
-      success: null
+      success: null,
+      note: req.note ? req.note.content : ''
     });
   }
 });
 
-// Update password
 app.post('/account/update-password', isAuthenticated, formUpload, async (req, res) => {
   try {
     console.log('Raw req.body:', req.body);
@@ -857,7 +800,8 @@ app.post('/account/update-password', isAuthenticated, formUpload, async (req, re
         storageLimitMB: user.storageLimit / (1024 * 1024),
         storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
         error: errors.join('; '),
-        success: null
+        success: null,
+        note: req.note ? req.note.content : ''
       });
     }
 
@@ -874,7 +818,8 @@ app.post('/account/update-password', isAuthenticated, formUpload, async (req, re
         storageLimitMB: user.storageLimit / (1024 * 1024),
         storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
         error: 'Incorrect current password',
-        success: null
+        success: null,
+        note: req.note ? req.note.content : ''
       });
     }
 
@@ -889,7 +834,8 @@ app.post('/account/update-password', isAuthenticated, formUpload, async (req, re
         storageLimitMB: user.storageLimit / (1024 * 1024),
         storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
         error: 'New passwords do not match',
-        success: null
+        success: null,
+        note: req.note ? req.note.content : ''
       });
     }
 
@@ -912,12 +858,12 @@ app.post('/account/update-password', isAuthenticated, formUpload, async (req, re
       storageLimitMB: user.storageLimit / (1024 * 1024),
       storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
       error: 'Server error',
-      success: null
+      success: null,
+      note: req.note ? req.note.content : ''
     });
   }
 });
 
-// Delete account
 app.post('/account/delete', isAuthenticated, formUpload, async (req, res) => {
   try {
     const { password, confirmDelete } = req.body;
@@ -933,7 +879,8 @@ app.post('/account/delete', isAuthenticated, formUpload, async (req, res) => {
         storageLimitMB: 500,
         storagePercentage: 0,
         error: 'Password and confirmation are required',
-        success: null
+        success: null,
+        note: req.note ? req.note.content : ''
       });
     }
     const user = await User.findById(req.session.userId);
@@ -949,7 +896,8 @@ app.post('/account/delete', isAuthenticated, formUpload, async (req, res) => {
         storageLimitMB: user.storageLimit / (1024 * 1024),
         storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
         error: 'Invalid password',
-        success: null
+        success: null,
+        note: req.note ? req.note.content : ''
       });
     }
     await Book.deleteMany({ uploadedBy: user._id });
@@ -958,6 +906,7 @@ app.post('/account/delete', isAuthenticated, formUpload, async (req, res) => {
       { accessList: user._id },
       { $pull: { accessList: user._id } }
     );
+    await Note.deleteOne({ user: user._id }); // Clean up the note
     await User.deleteOne({ _id: user._id });
     console.log('Delete account: Success');
     req.session.destroy(() => {
@@ -977,8 +926,86 @@ app.post('/account/delete', isAuthenticated, formUpload, async (req, res) => {
       storageLimitMB: 500,
       storagePercentage: 0,
       error: 'Server error',
-      success: null
+      success: null,
+      note: req.note ? req.note.content : ''
     });
+  }
+});
+
+const sanitizeHtml = require('sanitize-html');
+
+app.post('/notes/save', isAuthenticated, async (req, res) => {
+  try {
+    const { content } = req.body;
+    let note = await Note.findOne({ user: req.session.userId });
+    const sanitizedContent = sanitizeHtml(content || '', {
+      allowedTags: ['b', 'br'], // Allow only specific tags
+      allowedAttributes: {}
+    });
+    if (!note) {
+      note = new Note({
+        user: req.session.userId,
+        content: sanitizedContent
+      });
+    } else {
+      note.content = sanitizedContent;
+      note.updatedAt = Date.now();
+    }
+    await note.save();
+    res.json({ success: true, message: 'Note saved successfully' });
+  } catch (err) {
+    console.error('Save note error:', err);
+    res.status(500).json({ success: false, message: 'Failed to save note' });
+  }
+});
+
+app.get('/explore/search', isAuthenticated, async (req, res) => {
+  try {
+    const { query } = req.query;
+    const searchRegex = new RegExp(query, 'i');
+    const publicBooks = await Book.find({
+      visibility: 'public',
+      uploadedBy: { $ne: req.session.userId },
+      $or: [
+        { title: searchRegex },
+        { author: searchRegex },
+        { tags: searchRegex }
+      ]
+    }).populate('uploadedBy', 'username');
+    const accessibleBooks = await Book.find({
+      visibility: 'restricted',
+      accessList: req.session.userId,
+      uploadedBy: { $ne: req.session.userId },
+      $or: [
+        { title: searchRegex },
+        { author: searchRegex },
+        { tags: searchRegex }
+      ]
+    }).populate('uploadedBy', 'username');
+    const books = [...publicBooks, ...accessibleBooks];
+    res.json({ books });
+  } catch (err) {
+    console.error('Search error:', err);
+    res.status(500).json({ success: false, message: 'Failed to search books' });
+  }
+});
+
+app.get('/library/search', isAuthenticated, async (req, res) => {
+  try {
+    const { query } = req.query;
+    const searchRegex = new RegExp(query, 'i');
+    const userBooks = await Book.find({
+      uploadedBy: req.session.userId,
+      $or: [
+        { title: searchRegex },
+        { author: searchRegex },
+        { tags: searchRegex }
+      ]
+    });
+    res.json({ books: userBooks });
+  } catch (err) {
+    console.error('Search error:', err);
+    res.status(500).json({ success: false, message: 'Failed to search books' });
   }
 });
 
