@@ -527,9 +527,8 @@ app.get('/explore', isAuthenticated, async (req, res) => {
       visibility: 'public',
       uploadedBy: { $ne: req.session.userId }
     }).populate('uploadedBy', 'username');
-    const accessibleBooks = await Book.find({
+    const restrictedBooks = await Book.find({
       visibility: 'restricted',
-      accessList: req.session.userId,
       uploadedBy: { $ne: req.session.userId }
     }).populate('uploadedBy', 'username');
     const pendingRequests = await Request.find({
@@ -544,8 +543,9 @@ app.get('/explore', isAuthenticated, async (req, res) => {
     .sort({ pinCount: -1 })
     .limit(5)
     .populate('uploadedBy', 'username');
+    console.log('Public Books:', publicBooks.length, 'Restricted Books:', restrictedBooks.length);
     res.render('explore', { 
-      books: [...publicBooks, ...accessibleBooks],
+      books: [...publicBooks, ...restrictedBooks], // Include all restricted books
       trendingBooks,
       pendingBookIds,
       currentUser: req.session.userId,
