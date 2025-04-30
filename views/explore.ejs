@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <base href="/bookhive/"> <!-- Added to handle subfolder for static assets -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Explore Books - BookHive</title>
@@ -11,7 +12,7 @@
         <div class="container">
             <div class="logo-section">
                 <img src="/images/logo.jpg" alt="BookHive Logo" class="logo">
-              </div>
+            </div>
             <nav>
                 <a href="/library">My Library</a>
                 <a href="/pinned">Pinned Books</a>
@@ -61,8 +62,6 @@
                             <div class="book-info">
                                 <h3><%= book.title %></h3>
                                 <p class="author">by <%= book.author %></p>
-                                <!-- <p class="owner">Shared by: <%= book.uploadedBy ? book.uploadedBy.username : 'Unknown' %></p> -->
-                                <!-- <p class="file-type"><%= book.fileType.toUpperCase() %></p> -->
                                 <p class="visibility">
                                     <span class="visibility-badge visibility-<%= book.visibility %>">
                                         <%= book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1) %>
@@ -102,17 +101,20 @@
                             <div class="book-info">
                                 <h3><%= book.title %></h3>
                                 <p class="author">by <%= book.author %></p>
-                                <!-- <p class="owner">Shared by: <%= book.uploadedBy ? book.uploadedBy.username : 'Unknown' %></p> -->
-                                <!-- <p class="file-type"><%= book.fileType.toUpperCase() %></p> -->
                                 <p class="visibility">
                                     <span class="visibility-badge visibility-<%= book.visibility %>">
                                         <%= book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1) %>
                                     </span>
                                 </p>
                                 <div class="book-actions">
-                                    <a href="/view/<%= book._id %>" class="btn btn-primary">View</a>
-                                    <% if (book.visibility === 'restricted' && !book.accessList.includes(currentUser) && !pendingBookIds.includes(book._id.toString())) { %>
-                                        <button class="btn btn-secondary request-access" data-book-id="<%= book._id %>">Request Access</button>
+                                    <% if (book.visibility === 'public' || (book.visibility === 'restricted' && book.accessList.includes(currentUser))) { %>
+                                        <a href="/view/<%= book._id %>" class="btn btn-primary">View</a>
+                                    <% } else if (book.visibility === 'restricted') { %>
+                                        <% if (pendingBookIds.includes(book._id.toString())) { %>
+                                            <button class="btn btn-secondary disabled" disabled>Request Sent</button>
+                                        <% } else { %>
+                                            <button class="btn btn-secondary request-access" data-book-id="<%= book._id %>">Request Access</button>
+                                        <% } %>
                                     <% } %>
                                 </div>
                             </div>
@@ -151,19 +153,19 @@
             });
 
             async function saveNotes() {
-                const content = notesText.innerHTML; // Use innerHTML to capture bold tags
+                const content = notesText.innerHTML;
                 try {
-                const response = await fetch('/notes/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content })
-                });
-                const data = await response.json();
-                if (!data.success) {
-                    console.error('Failed to save note:', data.message);
-                }
+                    const response = await fetch('/notes/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content })
+                    });
+                    const data = await response.json();
+                    if (!data.success) {
+                        console.error('Failed to save note:', data.message);
+                    }
                 } catch (err) {
-                console.error('Error saving note:', err);
+                    console.error('Error saving note:', err);
                 }
             }
 
@@ -171,20 +173,6 @@
             const trendingBooksContainer = document.getElementById('trending-books-container');
             const searchForm = document.getElementById('search-form');
             const searchInput = document.getElementById('search-input');
-            // const debugBooksBtn = document.getElementById('debugBooks');
-
-            // Debug button to log book data
-            // debugBooksBtn.addEventListener('click', () => {
-            //     const books = Array.from(document.querySelectorAll('.book-card')).map(card => ({
-            //         id: card.dataset.id,
-            //         title: card.querySelector('h3').textContent,
-            //         author: card.querySelector('.author').textContent,
-            //         pinCount: card.querySelector('.pin-count').textContent,
-            //         isPinned: card.querySelector('.pin-icon').classList.contains('pinned')
-            //     }));
-            //     console.log('Explore Books Data:', books);
-            //     alert('Book data logged to Console');
-            // });
 
             // Check session status
             async function checkSession() {
@@ -215,7 +203,6 @@
                     const bookId = pinIcon.dataset.bookId;
                     console.log(`Pin/Unpin: Initiating for bookId=${bookId}`);
 
-                    // Verify session
                     const isAuthenticated = await checkSession();
                     if (!isAuthenticated) {
                         alert('Session expired. Please log in again.');
@@ -231,7 +218,7 @@
                             }
                         });
 
-                        console.log(`Pin/Unpin: Response status=${response.status}, ok=${response.ok}, Content-Type=${response.headers.get('Content-Type')}`);
+                        console.log(`Pin/Unpin: Response status=${response.status}, ok=${response.ok}`);
 
                         if (!response.ok) {
                             const contentType = response.headers.get('Content-Type');
@@ -239,23 +226,19 @@
                             if (contentType.includes('text/html')) {
                                 errorText = 'Received HTML response (possibly a login redirect)';
                             }
-                            throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+                            throw new Error(`HTTP ${response.status}: ${errorText}`);
                         }
 
                         const data = await response.json();
-                        console.log(`Pin/Unpin: Response data=`, data);
-
                         if (data.success) {
                             const pinCountElement = pinIcon.querySelector('.pin-count');
                             pinCountElement.textContent = data.pinCount;
-
                             if (data.isPinned) {
                                 pinIcon.classList.add('pinned');
                             } else {
                                 pinIcon.classList.remove('pinned');
                             }
                         } else {
-                            console.warn(`Pin/Unpin: Server returned success=false, message=${data.message}`);
                             alert(`Failed to update pin status: ${data.message}`);
                         }
                     } catch (err) {
@@ -291,18 +274,15 @@
                             if (contentType.includes('text/html')) {
                                 errorText = 'Received HTML response (possibly a login redirect)';
                             }
-                            throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+                            throw new Error(`HTTP ${response.status}: ${errorText}`);
                         }
 
                         const data = await response.json();
-                        console.log(`Request Access: Response data=`, data);
-
                         if (data.success) {
                             requestBtn.textContent = 'Request Sent';
                             requestBtn.disabled = true;
                             requestBtn.classList.add('disabled');
                         } else {
-                            console.warn(`Request Access: Server returned success=false, message=${data.message}`);
                             alert(`Failed to request access: ${data.message}`);
                         }
                     } catch (err) {
@@ -327,7 +307,7 @@
                         }
                     });
 
-                    console.log(`Search: Response status=${response.status}, ok=${response.ok}, Content-Type=${response.headers.get('Content-Type')}`);
+                    console.log(`Search: Response status=${response.status}, ok=${response.ok}`);
 
                     if (!response.ok) {
                         const contentType = response.headers.get('Content-Type');
@@ -335,12 +315,10 @@
                         if (contentType.includes('text/html')) {
                             errorText = 'Received HTML response (possibly a login redirect)';
                         }
-                        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+                        throw new Error(`HTTP ${response.status}: ${errorText}`);
                     }
 
                     const data = await response.json();
-                    console.log(`Search: Response data=`, data);
-
                     booksContainer.innerHTML = '';
 
                     if (!data.books || data.books.length === 0) {
@@ -372,7 +350,8 @@
                                         </span>
                                     </p>
                                     <div class="book-actions">
-                                        <a href="/view/${book._id}" class="btn btn-primary">View</a>
+                                        ${book.visibility === 'public' || (book.visibility === 'restricted' && book.accessList.includes('<%= currentUser %>')) ? `<a href="/view/${book._id}" class="btn btn-primary">View</a>` : ''}
+                                        ${book.visibility === 'restricted' && !book.accessList.includes('<%= currentUser %>') && <%= JSON.stringify(pendingBookIds) %>.includes(book._id.toString()) ? `<button class="btn btn-secondary disabled" disabled>Request Sent</button>` : ''}
                                         ${book.visibility === 'restricted' && !book.accessList.includes('<%= currentUser %>') && !<%= JSON.stringify(pendingBookIds) %>.includes(book._id.toString()) ? `<button class="btn btn-secondary request-access" data-book-id="${book._id}">Request Access</button>` : ''}
                                     </div>
                                 </div>
