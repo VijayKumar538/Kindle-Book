@@ -24,9 +24,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// // Serve static files
-// app.use(express.static(path.join(__dirname, 'public')));
-app.use('/bookhive', express.static(path.join(__dirname, 'public')));
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
+// app.use('/bookhive', express.static(path.join(__dirname, 'public')));
 
 // Middleware
 app.use(express.json());
