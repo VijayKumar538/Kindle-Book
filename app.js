@@ -26,51 +26,25 @@ app.use((req, res, next) => {
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
+// app.use('/bookhive', express.static(path.join(__dirname, 'public')));
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.set('view engine', 'ejs');
 
-// Session setup with shorter expiration (30 minutes)
-const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+// Session setup
 app.use(session({
   secret: 'your-secret-key',
   resave: false,
   saveUninitialized: false,
   store: MongoStore.create({ mongoUrl: 'mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qqrud.mongodb.net/MyLibrary1?retryWrites=true&w=majority&appName=MyLibrary' }),
-  cookie: { 
-    maxAge: SESSION_TIMEOUT, // Session expires after 30 minutes
-    secure: false, // Set to true if using HTTPS
-    httpOnly: true
-  }
+  cookie: { maxAge: 1000 * 60 * 60 * 24 } // 1 day
 }));
-
-// Middleware to check session timeout
-app.use((req, res, next) => {
-  if (req.session.userId) {
-    const now = Date.now();
-    const lastActivity = req.session.lastActivity || now;
-    
-    // Check if session has been inactive for too long
-    if (now - lastActivity > SESSION_TIMEOUT) {
-      req.session.destroy(() => {
-        res.clearCookie('connect.sid'); // Clear the session cookie
-        return res.redirect('/login');
-      });
-    } else {
-      // Update last activity timestamp
-      req.session.lastActivity = now;
-      next();
-    }
-  } else {
-    next();
-  }
-});
 
 // Debug middleware for form submissions
 app.use((req, res, next) => {
-  if (req.method === 'POST' && ['/account/update-profile', '/account/update-password', '/feedback'].includes(req.path)) {
+  if (req.method === 'POST' && ['/account/update-profile', '/account/update-password'].includes(req.path)) {
     console.log(`Request to ${req.path}:`, {
       headers: req.headers,
       body: req.body
@@ -171,19 +145,11 @@ const noteSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-// New Feedback schema
-const feedbackSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  content: { type: String, required: true },
-  submittedAt: { type: Date, default: Date.now }
-});
-
 // Models
 const User = mongoose.model('User', userSchema);
 const Book = mongoose.model('Book', bookSchema);
 const Request = mongoose.model('Request', requestSchema);
 const Note = mongoose.model('Note', noteSchema);
-const Feedback = mongoose.model('Feedback', feedbackSchema); // Added Feedback model
 
 // Configure multer for file uploads (PDFs)
 const upload = multer({
@@ -210,7 +176,7 @@ const isAuthenticated = (req, res, next) => {
   if (req.session.userId) {
     return next();
   }
-  res.status(401).json({ success: false, message: 'User not authenticated' }); // Updated to return JSON
+  res.redirect('/login');
 };
 
 // Error handling middleware for multer
@@ -281,7 +247,6 @@ app.post('/login', async (req, res) => {
       return res.status(400).render('login', { error: 'Invalid credentials', user: req.user, note: req.note ? req.note.content : '' });
     }
     req.session.userId = user._id;
-    req.session.lastActivity = Date.now(); // Initialize last activity
     res.redirect('/library');
   } catch (err) {
     console.error('Login error:', err);
@@ -290,12 +255,7 @@ app.post('/login', async (req, res) => {
 });
 
 app.get('/logout', (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      console.error('Logout error:', err);
-      return res.status(500).send('Failed to logout');
-    }
-    res.clearCookie('connect.sid'); // Explicitly clear session cookie
+  req.session.destroy(() => {
     res.redirect('/');
   });
 });
@@ -319,15 +279,15 @@ app.get('/library', isAuthenticated, async (req, res) => {
 app.get('/pinned', isAuthenticated, async (req, res) => {
   try {
     const user = req.user;
-    await user.populate('pinnedBooks');
-    res.render('pinned', {
+    await user.populate('pinnedBooks'); // Populate pinnedBooks
+    res.render('pinned', { 
       pinnedBooks: user.pinnedBooks,
       user,
       note: req.note ? req.note.content : ''
     });
   } catch (err) {
     console.error('Pinned books error:', err);
-    res.status(500).render('error', { message: 'Failed to load pinned books', user: req.user, note: req.note ? req.note.content : '' });
+    res.status(500).render('error', { message: 'Failed to load your pinned books', user: req.user, note: req.note ? req.note.content : '' });
   }
 });
 
@@ -349,8 +309,8 @@ app.post('/book/:bookId/pin', isAuthenticated, async (req, res) => {
     }
     await user.save();
     await book.save();
-    res.json({
-      success: true,
+    res.json({ 
+      success: true, 
       isPinned: !isPinned,
       pinCount: book.pinCount
     });
@@ -377,22 +337,22 @@ app.post('/upload', isAuthenticated, upload.single('file'), async (req, res) => 
     const user = await User.findById(req.session.userId);
     const fileSize = req.file.size;
     if (user.storageUsed + fileSize > user.storageLimit) {
-      return res.status(400).render('upload', {
-        error: 'Storage limit exceeded. Delete some files or upgrade your plan.',
+      return res.status(400).render('upload', { 
+        error: 'You have exceeded your storage limit. Please delete some files or upgrade your plan.',
         user: req.user,
         note: req.note ? req.note.content : ''
       });
     }
     const fileType = getFileTypeFromMime(req.file.mimetype);
     if (!fileType) {
-      return res.status(400).render('upload', { error: 'Only PDF files allowed', user: req.user, note: req.note ? req.note.content : '' });
+      return res.status(400).render('upload', { error: 'Only PDF files are allowed', user: req.user, note: req.note ? req.note.content : '' });
     }
     const newBook = new Book({
       title,
       author,
       fileName: req.file.originalname,
       fileData: req.file.buffer,
-      fileType,
+      fileType: fileType,
       contentType: req.file.mimetype,
       description,
       tags: tagArray,
@@ -414,13 +374,13 @@ app.get('/view/:bookId', isAuthenticated, async (req, res) => {
   try {
     const book = await Book.findById(req.params.bookId);
     if (!book) {
-      return res.status(404).render('error', { message: 'Book not found', user: req.user, note: req.note ? req.note.content : '' });
+      return res.status(400).render('error', { message: 'Book not found', user: req.user, note: req.note ? req.note.content : '' });
     }
     const isOwner = book.uploadedBy.toString() === req.session.userId;
     const hasAccess = book.accessList.includes(req.session.userId);
     const isPublic = book.visibility === 'public';
     if (!isOwner && !isPublic && !hasAccess) {
-      return res.status(403).render('error', { message: 'Access denied', user: req.user, note: req.note ? req.note.content : '' });
+      return res.status(403).render('error', { message: 'You do not have access to this file', user: req.user, note: req.note ? req.note.content : '' });
     }
     res.render('pdf-viewer', { book, user: req.user, note: req.note ? req.note.content : '' });
   } catch (err) {
@@ -458,8 +418,8 @@ app.get('/thumbnail/:bookId', async (req, res) => {
     if (!book || !book.thumbnail) {
       return res.sendFile(path.join(__dirname, 'public', 'images', 'default-thumbnail.jpg'), (err) => {
         if (err) {
-          console.error('Default thumbnail error:', err);
-          res.status(404).send('Thumbnail not found');
+          console.error('Default thumbnail not found:', err);
+          res.status(404).send('Default thumbnail not found');
         }
       });
     }
@@ -478,7 +438,7 @@ app.delete('/book/:id', isAuthenticated, async (req, res) => {
   try {
     const book = await Book.findOne({ _id: req.params.id, uploadedBy: req.session.userId });
     if (!book) {
-      return res.status(404).json({ success: false, message: 'Book not found' });
+      return res.status(400).json({ success: false, message: 'Book not found' });
     }
     const user = await User.findById(req.session.userId);
     user.storageUsed = Math.max(0, user.storageUsed - book.fileSize);
@@ -499,24 +459,24 @@ app.put('/book/:bookId/visibility', isAuthenticated, async (req, res) => {
   try {
     const { visibility } = req.body;
     if (!['private', 'public', 'restricted'].includes(visibility)) {
-      return res.status(400).json({ success: false, message: 'Invalid visibility' });
+      return res.status(400).json({ success: false, message: 'Invalid visibility option' });
     }
     const book = await Book.findById(req.params.bookId);
     if (!book) {
       return res.status(404).json({ success: false, message: 'Book not found' });
     }
     if (book.uploadedBy.toString() !== req.session.userId) {
-      return res.status(403).json({ success: false, message: 'Unauthorized' });
+      return res.status(403).json({ success: false, message: 'You do not own this book' });
     }
     book.visibility = visibility;
     if (visibility !== 'restricted') {
       book.accessList = [];
     }
     await book.save();
-    res.json({ success: true });
+    res.json({ success: true, message: 'Visibility updated successfully' });
   } catch (err) {
-    console.error('Visibility update error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Update visibility error:', err);
+    res.status(500).json({ success: false, message: 'Failed to update visibility' });
   }
 });
 
@@ -527,13 +487,15 @@ app.get('/book/:bookId/access-list', isAuthenticated, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Book not found' });
     }
     if (book.uploadedBy.toString() !== req.session.userId) {
-      return res.status(403).json({ success: false, message: 'Unauthorized' });
+      return res.status(403).json({ success: false, message: 'You do not own this book' });
     }
-    const users = await User.find({ _id: { $in: book.accessList } }).select('username email');
+    const users = await User.find({
+      _id: { $in: book.accessList }
+    }).select('username email');
     res.json({ success: true, users });
   } catch (err) {
-    console.error('Access list error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('Get access list error:', err);
+    res.status(500).json({ success: false, message: 'Failed to get access list' });
   }
 });
 
@@ -544,14 +506,17 @@ app.delete('/book/:bookId/access/:userId', isAuthenticated, async (req, res) => 
       return res.status(404).json({ success: false, message: 'Book not found' });
     }
     if (book.uploadedBy.toString() !== req.session.userId) {
-      return res.status(403).json({ success: false, message: 'Unauthorized' });
+      return res.status(403).json({ success: false, message: 'You do not own this book' });
     }
-    book.accessList = book.accessList.filter(id => id.toString() !== req.params.userId);
-    await book.save();
-    res.json({ success: true });
+    const userIndex = book.accessList.indexOf(req.params.userId);
+    if (userIndex !== -1) {
+      book.accessList.splice(userIndex, 1);
+      await book.save();
+    }
+    res.json({ success: true, message: 'Access removed successfully' });
   } catch (err) {
     console.error('Remove access error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Failed to remove access' });
   }
 });
 
@@ -575,11 +540,12 @@ app.get('/explore', isAuthenticated, async (req, res) => {
       visibility: 'public',
       pinCount: { $gt: 0 }
     })
-      .sort({ pinCount: -1 })
-      .limit(5)
-      .populate('uploadedBy', 'username');
-    res.render('explore', {
-      books: [...publicBooks, ...restrictedBooks],
+    .sort({ pinCount: -1 })
+    .limit(5)
+    .populate('uploadedBy', 'username');
+    console.log('Public Books:', publicBooks.length, 'Restricted Books:', restrictedBooks.length);
+    res.render('explore', { 
+      books: [...publicBooks, ...restrictedBooks], // Include all restricted books
       trendingBooks,
       pendingBookIds,
       currentUser: req.session.userId,
@@ -589,7 +555,7 @@ app.get('/explore', isAuthenticated, async (req, res) => {
     });
   } catch (err) {
     console.error('Explore error:', err);
-    res.status(500).render('error', { message: 'Failed to load explore page???', user: req.user, note: req.note ? req.note.content : '' });
+    res.status(500).render('error', { message: 'Failed to load public books', user: req.user, note: req.note ? req.note.content : '' });
   }
 });
 
@@ -607,7 +573,7 @@ app.get('/my-requests', isAuthenticated, async (req, res) => {
 
 app.get('/access-requests', isAuthenticated, async (req, res) => {
   try {
-    const receivedRequests = await Request.find({
+    const receivedRequests = await Request.find({ 
       bookOwner: req.session.userId,
       status: 'pending'
     })
@@ -640,10 +606,10 @@ app.post('/request-access/:bookId', isAuthenticated, async (req, res) => {
       bookOwner: book.uploadedBy
     });
     await request.save();
-    res.json({ success: true, message: 'Access request sent' });
+    res.json({ success: true, message: 'Access request sent successfully' });
   } catch (err) {
     console.error('Request access error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Failed to send request' });
   }
 });
 
@@ -653,7 +619,8 @@ app.post('/handle-request/:requestId', isAuthenticated, async (req, res) => {
     if (!['approve', 'decline'].includes(action)) {
       return res.status(400).json({ success: false, message: 'Invalid action' });
     }
-    const request = await Request.findById(req.params.requestId).populate('book');
+    const request = await Request.findById(req.params.requestId)
+      .populate('book');
     if (!request) {
       return res.status(404).json({ success: false, message: 'Request not found' });
     }
@@ -670,31 +637,31 @@ app.post('/handle-request/:requestId', isAuthenticated, async (req, res) => {
         await book.save();
       }
     }
-    res.json({ success: true, message: `Request ${action}d` });
+    res.json({ success: true, message: `Request ${action}d successfully` });
   } catch (err) {
     console.error('Handle request error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Failed to process request' });
   }
 });
 
 app.get('/account', isAuthenticated, async (req, res) => {
   try {
     const user = req.user;
-    const storageUsedMB = (user.storageUsed / (1024 * 1024)).toFixed(1);
-    const storageLimitMB = user.storageLimit / (1024 * 1024);
-    const storagePercentage = ((user.storageUsed / user.storageLimit) * 100).toFixed(0);
-    res.render('account', {
-      user,
-      storageUsedMB,
-      storageLimitMB,
+    const storageUsedMB = Math.round(user.storageUsed / (1024 * 1024) * 10) / 10;
+    const storageLimitMB = Math.round(user.storageLimit / (1024 * 1024));
+    const storagePercentage = Math.round((user.storageUsed / user.storageLimit) * 100);
+    res.render('account', { 
+      user, 
+      storageUsedMB, 
+      storageLimitMB, 
       storagePercentage,
       error: null,
       success: null,
       note: req.note ? req.note.content : ''
     });
   } catch (err) {
-    console.error('Account error:', err);
-    res.status(500).render('error', { message: 'Failed to load account', user: req.user, note: req.note ? req.note.content : '' });
+    console.error('Account settings error:', err);
+    res.status(500).render('error', { message: 'Failed to load account settings', user: req.user, note: req.note ? req.note.content : '' });
   }
 });
 
@@ -704,9 +671,9 @@ app.get('/account/storage-info', isAuthenticated, async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    const storageUsedMB = (user.storageUsed / (1024 * 1024)).toFixed(1);
-    const storageLimitMB = user.storageLimit / (1024 * 1024);
-    const storagePercentage = ((user.storageUsed / user.storageLimit) * 100).toFixed(0);
+    const storageUsedMB = Math.round(user.storageUsed / (1024 * 1024) * 10) / 10;
+    const storageLimitMB = Math.round(user.storageLimit / (1024 * 1024));
+    const storagePercentage = Math.round((user.storageUsed / user.storageLimit) * 100);
     res.json({
       success: true,
       storageUsedMB,
@@ -715,77 +682,94 @@ app.get('/account/storage-info', isAuthenticated, async (req, res) => {
     });
   } catch (err) {
     console.error('Storage info error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Failed to fetch storage information' });
   }
 });
 
 app.post('/account/update-profile', isAuthenticated, formUpload, async (req, res) => {
   try {
+    console.log('Raw req.body:', req.body);
     const { username, email, currentPassword } = req.body;
-    if (!username || !email || !currentPassword) {
+
+    const errors = [];
+    if (!username || username.trim() === '') errors.push('Username is required');
+    if (!email || email.trim() === '') errors.push('Email is required');
+    if (!currentPassword || currentPassword.trim() === '') errors.push('Current password is required');
+
+    if (errors.length > 0) {
+      console.log('Update profile: Validation errors', errors);
       if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'All fields required' });
+        return res.status(400).json({ success: false, message: errors.join('; ') });
       }
+      const user = await User.findById(req.session.userId);
       return res.status(400).render('account', {
-        user: req.user,
-        storageUsedMB: (req.user.storageUsed / (1024 * 1024)).toFixed(1),
-        storageLimitMB: req.user.storageLimit / (1024 * 1024),
-        storagePercentage: ((req.user.storageUsed / req.user.storageLimit) * 100).toFixed(0),
-        error: 'All fields required',
+        user,
+        storageUsedMB: user.storageUsed / (1024 * 1024),
+        storageLimitMB: user.storageLimit / (1024 * 1024),
+        storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
+        error: errors.join('; '),
         success: null,
         note: req.note ? req.note.content : ''
       });
     }
+
     const user = await User.findById(req.session.userId);
-    if (!await bcrypt.compare(currentPassword, user.password)) {
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      console.log('Update profile: Incorrect current password');
       if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'Incorrect password' });
+        return res.status(400).json({ success: false, message: 'Incorrect current password' });
       }
       return res.status(400).render('account', {
         user,
-        storageUsedMB: (user.storageUsed / (1024 * 1024)).toFixed(1),
+        storageUsedMB: user.storageUsed / (1024 * 1024),
         storageLimitMB: user.storageLimit / (1024 * 1024),
-        storagePercentage: ((user.storageUsed / user.storageLimit) * 100).toFixed(0),
-        error: 'Incorrect password',
+        storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
+        error: 'Incorrect current password',
         success: null,
         note: req.note ? req.note.content : ''
       });
     }
+
     const existingUser = await User.findOne({
       $or: [{ username }, { email }],
-      _id: { $ne: req.session.userId }
+      _id: { $ne: user._id }
     });
     if (existingUser) {
+      console.log('Update profile: Username or email already taken', { username, email });
       if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'Username or email taken' });
+        return res.status(400).json({ success: false, message: 'Username or email already taken' });
       }
       return res.status(400).render('account', {
         user,
-        storageUsedMB: (user.storageUsed / (1024 * 1024)).toFixed(1),
+        storageUsedMB: user.storageUsed / (1024 * 1024),
         storageLimitMB: user.storageLimit / (1024 * 1024),
-        storagePercentage: ((user.storageUsed / user.storageLimit) * 100).toFixed(0),
-        error: 'Username or email taken',
+        storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
+        error: 'Username or email already taken',
         success: null,
         note: req.note ? req.note.content : ''
       });
     }
-    user.username = username;
-    user.email = email;
+
+    user.username = username.trim();
+    user.email = email.trim();
     await user.save();
+    console.log('Update profile: Success', { username, email });
     if (req.xhr) {
-      return res.json({ success: true, message: 'Profile updated' });
+      return res.json({ success: true, message: 'Profile updated successfully' });
     }
-    res.redirect('/account');
+    return res.redirect('/account');
   } catch (err) {
     console.error('Update profile error:', err);
     if (req.xhr) {
       return res.status(500).json({ success: false, message: 'Server error' });
     }
-    res.status(500).render('account', {
-      user: req.user,
-      storageUsedMB: (req.user.storageUsed / (1024 * 1024)).toFixed(1),
-      storageLimitMB: req.user.storageLimit / (1024 * 1024),
-      storagePercentage: ((req.user.storageUsed / req.user.storageLimit) * 100).toFixed(0),
+    const user = await User.findById(req.session.userId);
+    return res.status(500).render('account', {
+      user,
+      storageUsedMB: user.storageUsed / (1024 * 1024),
+      storageLimitMB: user.storageLimit / (1024 * 1024),
+      storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
       error: 'Server error',
       success: null,
       note: req.note ? req.note.content : ''
@@ -795,68 +779,86 @@ app.post('/account/update-profile', isAuthenticated, formUpload, async (req, res
 
 app.post('/account/update-password', isAuthenticated, formUpload, async (req, res) => {
   try {
+    console.log('Raw req.body:', req.body);
     const { currentPassword, newPassword, confirmPassword } = req.body;
-    if (!currentPassword || !newPassword || !confirmPassword) {
+
+    // Validate fields
+    const errors = [];
+    if (!currentPassword || currentPassword.trim() === '') errors.push('Current password is required');
+    if (!newPassword || newPassword.trim() === '') errors.push('New password is required');
+    if (!confirmPassword || confirmPassword.trim() === '') errors.push('Confirm password is required');
+
+    if (errors.length > 0) {
+      console.log('Update password: Validation errors', errors);
       if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'All fields required' });
+        return res.status(400).json({ success: false, message: errors.join('; ') });
       }
+      const user = await User.findById(req.session.userId);
       return res.status(400).render('account', {
-        user: req.user,
-        storageUsedMB: (req.user.storageUsed / (1024 * 1024)).toFixed(1),
-        storageLimitMB: req.user.storageLimit / (1024 * 1024),
-        storagePercentage: ((req.user.storageUsed / req.user.storageLimit) * 100).toFixed(0), 
-        error: 'All fields required',
+        user,
+        storageUsedMB: user.storageUsed / (1024 * 1024),
+        storageLimitMB: user.storageLimit / (1024 * 1024),
+        storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
+        error: errors.join('; '),
         success: null,
         note: req.note ? req.note.content : ''
       });
     }
+
     const user = await User.findById(req.session.userId);
-    if (!await bcrypt.compare(currentPassword, user.password)) {
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      console.log('Update password: Incorrect current password');
       if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'Incorrect password' });
+        return res.status(400).json({ success: false, message: 'Incorrect current password' });
       }
       return res.status(400).render('account', {
         user,
-        storageUsedMB: (user.storageUsed / (1024 * 1024)).toFixed(1),
+        storageUsedMB: user.storageUsed / (1024 * 1024),
         storageLimitMB: user.storageLimit / (1024 * 1024),
-        storagePercentage: ((user.storageUsed / user.storageLimit) * 100).toFixed(0),
-        error: 'Incorrect password',
+        storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
+        error: 'Incorrect current password',
         success: null,
         note: req.note ? req.note.content : ''
       });
     }
+
     if (newPassword !== confirmPassword) {
+      console.log('Update password: New passwords do not match');
       if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'Passwords do not match' });
+        return res.status(400).json({ success: false, message: 'New passwords do not match' });
       }
       return res.status(400).render('account', {
         user,
-        storageUsedMB: (user.storageUsed / (1024 * 1024)).toFixed(1),
+        storageUsedMB: user.storageUsed / (1024 * 1024),
         storageLimitMB: user.storageLimit / (1024 * 1024),
-        storagePercentage: ((user.storageUsed / user.storageLimit) * 100).toFixed(0),
-        error: 'Passwords do not match',
+        storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
+        error: 'New passwords do not match',
         success: null,
         note: req.note ? req.note.content : ''
       });
     }
+
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
+    console.log('Update password: Success');
     if (req.xhr) {
-      return res.json({ success: true, message: 'Password updated' });
+      return res.json({ success: true, message: 'Password updated successfully' });
     }
-    res.redirect('/account');
+    return res.redirect('/account');
   } catch (err) {
     console.error('Update password error:', err);
     if (req.xhr) {
       return res.status(500).json({ success: false, message: 'Server error' });
     }
-    res.status(500).render('account', {
-      user: req.user,
-      storageUsedMB: (req.user.storageUsed / (1024 * 1024)).toFixed(1),
-      storageLimitMB: req.user.storageLimit / (1024 * 1024),
-      storagePercentage: ((req.user.storageUsed / req.user.storageLimit) * 100).toFixed(0),
+    const user = await User.findById(req.session.userId);
+    return res.status(500).render('account', {
+      user,
+      storageUsedMB: user.storageUsed / (1024 * 1024),
+      storageLimitMB: user.storageLimit / (1024 * 1024),
+      storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
       error: 'Server error',
-      success: personally,
+      success: null,
       note: req.note ? req.note.content : ''
     });
   }
@@ -865,31 +867,35 @@ app.post('/account/update-password', isAuthenticated, formUpload, async (req, re
 app.post('/account/delete', isAuthenticated, formUpload, async (req, res) => {
   try {
     const { password, confirmDelete } = req.body;
+    console.log('Delete account: Received data', { password, confirmDelete });
     if (!password || !confirmDelete) {
+      console.log('Delete account: Missing password or confirmation', { password, confirmDelete });
       if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'Password and confirmation required' });
+        return res.status(400).json({ success: false, message: 'Password and confirmation are required' });
       }
       return res.status(400).render('account', {
-        user: req.user,
-        storageUsedMB: (req.user.storageUsed / (1024 * 1024)).toFixed(1),
-        storageLimitMB: req.user.storageLimit / (1024 * 1024),
-        storagePercentage: ((req.user.storageUsed / req.user.storageLimit) * 100).toFixed(0),
-        error: 'Password and confirmation required',
+        user: await User.findById(req.session.userId),
+        storageUsedMB: 0,
+        storageLimitMB: 500,
+        storagePercentage: 0,
+        error: 'Password and confirmation are required',
         success: null,
         note: req.note ? req.note.content : ''
       });
     }
     const user = await User.findById(req.session.userId);
-    if (!await bcrypt.compare(password, user.password)) {
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      console.log('Delete account: Invalid password');
       if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'Incorrect password' });
+        return res.status(400).json({ success: false, message: 'Invalid password' });
       }
       return res.status(400).render('account', {
         user,
-        storageUsedMB: (user.storageUsed / (1024 * 1024)).toFixed(1),
+        storageUsedMB: user.storageUsed / (1024 * 1024),
         storageLimitMB: user.storageLimit / (1024 * 1024),
-        storagePercentage: ((user.storageUsed / user.storageLimit) * 100).toFixed(0),
-        error: 'Incorrect password',
+        storagePercentage: Math.round((user.storageUsed / user.storageLimit) * 100),
+        error: 'Invalid password',
         success: null,
         note: req.note ? req.note.content : ''
       });
@@ -900,33 +906,25 @@ app.post('/account/delete', isAuthenticated, formUpload, async (req, res) => {
       { accessList: user._id },
       { $pull: { accessList: user._id } }
     );
-    await Note.deleteOne({ user: user._id });
-    await Feedback.deleteMany({ user: user._id }); // Clean up feedback on user deletion
+    await Note.deleteOne({ user: user._id }); // Clean up the note
     await User.deleteOne({ _id: user._id });
-    req.session.destroy(err => {
-      if (err) {
-        console.error('Session destroy error:', err);
-        if (req.xhr) {
-          return res.status(500).json({ success: false, message: 'Server error' });
-        }
-        return res.status(500).render('error', { message: 'Failed to delete account', user: null, note: '' });
-      }
-      res.clearCookie('connect.sid');
+    console.log('Delete account: Success');
+    req.session.destroy(() => {
       if (req.xhr) {
-        return res.json({ success: true, redirect: '/' });
+        return res.json({ success: true, message: 'Account deleted successfully', redirect: '/' });
       }
-      res.redirect('/');
+      return res.redirect('/');
     });
   } catch (err) {
     console.error('Delete account error:', err);
     if (req.xhr) {
       return res.status(500).json({ success: false, message: 'Server error' });
     }
-    res.status(500).render('account', {
-      user: req.user,
-      storageUsedMB: (req.user.storageUsed / (1024 * 1024)).toFixed(1),
-      storageLimitMB: req.user.storageLimit / (1024 * 1024),
-      storagePercentage: ((req.user.storageUsed / req.user.storageLimit) * 100).toFixed(0),
+    return res.status(500).render('account', {
+      user: await User.findById(req.session.userId),
+      storageUsedMB: 0,
+      storageLimitMB: 500,
+      storagePercentage: 0,
       error: 'Server error',
       success: null,
       note: req.note ? req.note.content : ''
@@ -939,7 +937,7 @@ app.post('/notes/save', isAuthenticated, async (req, res) => {
     const { content } = req.body;
     let note = await Note.findOne({ user: req.session.userId });
     const sanitizedContent = sanitizeHtml(content || '', {
-      allowedTags: ['b', 'i', 'u', 'br'],
+      allowedTags: ['b', 'br'], // Allow only specific tags
       allowedAttributes: {}
     });
     if (!note) {
@@ -949,10 +947,10 @@ app.post('/notes/save', isAuthenticated, async (req, res) => {
       });
     } else {
       note.content = sanitizedContent;
-      note.updatedAt = new Date();
+      note.updatedAt = Date.now();
     }
     await note.save();
-    res.json({ success: true });
+    res.json({ success: true, message: 'Note saved successfully' });
   } catch (err) {
     console.error('Save note error:', err);
     res.status(500).json({ success: false, message: 'Failed to save note' });
@@ -962,9 +960,6 @@ app.post('/notes/save', isAuthenticated, async (req, res) => {
 app.get('/explore/search', isAuthenticated, async (req, res) => {
   try {
     const { query } = req.query;
-    if (!query) {
-      return res.json({ books: [] });
-    }
     const searchRegex = new RegExp(query, 'i');
     const publicBooks = await Book.find({
       visibility: 'public',
@@ -985,19 +980,17 @@ app.get('/explore/search', isAuthenticated, async (req, res) => {
         { tags: searchRegex }
       ]
     }).populate('uploadedBy', 'username');
-    res.json({ books: [...publicBooks, ...accessibleBooks] });
+    const books = [...publicBooks, ...accessibleBooks];
+    res.json({ books });
   } catch (err) {
     console.error('Search error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: 'Failed to search books' });
   }
 });
 
 app.get('/library/search', isAuthenticated, async (req, res) => {
   try {
     const { query } = req.query;
-    if (!query) {
-      return res.json({ books: [] });
-    }
     const searchRegex = new RegExp(query, 'i');
     const userBooks = await Book.find({
       uploadedBy: req.session.userId,
@@ -1010,30 +1003,7 @@ app.get('/library/search', isAuthenticated, async (req, res) => {
     res.json({ books: userBooks });
   } catch (err) {
     console.error('Search error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
-// Feedback route (POST only)
-app.post('/feedback', isAuthenticated, async (req, res) => {
-  try {
-    const { content } = req.body;
-    if (!content || content.trim() === '') {
-      return res.status(400).json({ success: false, message: 'Feedback content is required' });
-    }
-    const sanitizedContent = sanitizeHtml(content, {
-      allowedTags: [],
-      allowedAttributes: {}
-    });
-    const feedback = new Feedback({
-      user: req.session.userId,
-      content: sanitizedContent
-    });
-    await feedback.save();
-    res.json({ success: true, message: 'Feedback submitted successfully' });
-  } catch (err) {
-    console.error('Feedback submission error:', err);
-    res.status(500).json({ success: false, message: 'Failed to submit feedback' });
+    res.status(500).json({ success: false, message: 'Failed to search books' });
   }
 });
 
