@@ -207,17 +207,17 @@
             async function saveNotes() {
                 const content = notesText.innerHTML;
                 try {
-                const response = await fetch('/notes/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content })
-                });
-                const data = await response.json();
-                if (!data.success) {
-                    console.error('Failed to save note:', data.message);
-                }
+                    const response = await fetch('/notes/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content })
+                    });
+                    const data = await response.json();
+                    if (!data.success) {
+                        console.error('Failed to save note:', data.message);
+                    }
                 } catch (err) {
-                console.error('Error saving note:', err);
+                    console.error('Error saving note:', err);
                 }
             }
 
