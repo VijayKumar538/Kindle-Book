@@ -14,7 +14,7 @@
       </div>
       <nav>
         <a href="/library" class="active">My Library</a>
-        <a href="/pinned">Pinned Books</a>
+        <!-- <a href="/pinned">Pinned Books</a> -->
         <a href="/explore">Explore</a>
         <a href="/upload">Upload</a>
         <a href="/account">Account</a>
@@ -95,10 +95,10 @@
           <div class="book-card" data-id="<%= book._id %>">
             <div class="book-cover">
               <img src="/thumbnail/<%= book._id %>" alt="<%= book.title %> cover" class="thumbnail" onerror="this.src='/images/default-thumbnail.png'">
-              <div class="pin-icon <%= pinnedBooks.includes(book._id.toString()) ? 'pinned' : '' %>" data-book-id="<%= book._id %>">
+              <!-- <div class="pin-icon <%= pinnedBooks.includes(book._id.toString()) ? 'pinned' : '' %>" data-book-id="<%= book._id %>">
                 <span class="pin-count"><%= book.pinCount || 0 %></span>
                 📌
-              </div>
+              </div> -->
             </div>
             <div class="book-info">
               <h3><%= book.title %></h3>

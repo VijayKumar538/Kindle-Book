@@ -335,8 +335,13 @@ app.post('/book/:bookId/pin', isAuthenticated, async (req, res) => {
   try {
     const bookId = req.params.bookId;
     const user = await User.findById(req.session.userId);
+    if (!user) {
+      console.error(`User not found for ID: ${req.session.userId}`);
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
     const book = await Book.findById(bookId);
     if (!book) {
+      console.error(`Book not found for ID: ${bookId}`);
       return res.status(404).json({ success: false, message: 'Book not found' });
     }
     const isPinned = user.pinnedBooks.includes(bookId);
@@ -349,13 +354,14 @@ app.post('/book/:bookId/pin', isAuthenticated, async (req, res) => {
     }
     await user.save();
     await book.save();
+    console.log(`Pin updated: bookId=${bookId}, isPinned=${!isPinned}, pinCount=${book.pinCount}`);
     res.json({
       success: true,
       isPinned: !isPinned,
       pinCount: book.pinCount
     });
   } catch (err) {
-    console.error('Pin/unpin error:', err);
+    console.error(`Pin/unpin error for bookId=${req.params.bookId}:`, err);
     res.status(500).json({ success: false, message: 'Failed to update pin status' });
   }
 });
