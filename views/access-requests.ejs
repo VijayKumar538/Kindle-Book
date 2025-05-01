@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Access Requests - BookHive</title>
+  <title>Access Requests - MyLibrary</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -19,7 +19,7 @@
         <a href="/explore">Explore</a>
         <a href="/my-requests">My Requests</a>
         <a href="/access-requests" class="active">Access Requests</a>
-        <a href="/upload">Upload Book</a>
+        <a href="/upload">Upload</a>
         <a href="/account">Account</a>
         <a href="/logout">Logout</a>
       </nav>
@@ -46,10 +46,8 @@
           <thead>
             <tr>
               <th>Book</th>
-              <th>Author</th>
               <th>Requested By</th>
               <th>Request Date</th>
-              <th>File Type</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -57,17 +55,14 @@
             <% requests.forEach(request => { %>
               <tr data-request-id="<%= request._id %>">
                 <td><%= request.book ? request.book.title : 'Unknown Book' %></td>
-                <td><%= request.book ? request.book.author : 'Unknown Author' %></td>
                 <td>
                   <%= request.requestedBy ? request.requestedBy.username : 'Unknown User' %>
                   <span class="email">(<%= request.requestedBy ? request.requestedBy.email : '' %>)</span>
                 </td>
-                <td class="request-date"><%= new Date(request.requestDate).toLocaleDateString() %></td>
-                <td><%= request.book ? request.book.fileType.toUpperCase() : 'Unknown' %></td>
+                <td><%= new Date(request.requestDate).toLocaleDateString() %></td>
                 <td class="action-buttons">
                   <button class="btn btn-small btn-primary handle-request" data-action="approve">Approve</button>
                   <button class="btn btn-small btn-danger handle-request" data-action="decline">Decline</button>
-                  <a href="/view/<%= request.book._id %>" class="btn btn-small btn-secondary">Preview</a>
                 </td>
               </tr>
             <% }) %>
@@ -79,64 +74,43 @@
   
   <footer>
     <div class="container">
-      <p>&copy; 2025 BookHive. All rights reserved.</p>
+      <p>&copy; 2025 MyLibrary. All rights reserved.</p>
     </div>
   </footer>
   
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const notesToggle = document.querySelector('.notes-toggle');
-      const notesArea = document.querySelector('.notes-area');
-      const notesText = document.getElementById('notesText');
-      let typingTimer;
+            const notesToggle = document.querySelector('.notes-toggle');
+            const notesArea = document.querySelector('.notes-area');
+            const notesText = document.getElementById('notesText');
+            let typingTimer;
 
-      notesToggle.addEventListener('click', () => {
-        const isVisible = notesArea.style.display === 'block';
-        notesArea.style.display = isVisible ? 'none' : 'block';
-      });
-
-      notesText.addEventListener('input', () => {
-        clearTimeout(typingTimer);
-        typingTimer = setTimeout(saveNotes, 1000);
-      });
-
-      async function saveNotes() {
-        const content = notesText.innerHTML; // Use innerHTML to capture bold tags
-        try {
-          const response = await fetch('/notes/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content })
-          });
-          const data = await response.json();
-          if (!data.success) {
-            console.error('Failed to save note:', data.message);
-          }
-        } catch (err) {
-          console.error('Error saving note:', err);
-        }
-      }
-      // Format dates for better display
-      const formatDates = () => {
-        const dateElements = document.querySelectorAll('.request-date');
-        dateElements.forEach(element => {
-          try {
-            const date = new Date(element.textContent.trim());
-            const formattedDate = date.toLocaleDateString(undefined, {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric'
+            notesToggle.addEventListener('click', () => {
+                const isVisible = notesArea.style.display === 'block';
+                notesArea.style.display = isVisible ? 'none' : 'block';
             });
-            element.textContent = formattedDate;
-          } catch (err) {
-            console.error('Error formatting date:', err);
-          }
-        });
-      };
-      
-      formatDates();
-      
-      // Handle approve/decline requests
+
+            notesText.addEventListener('input', () => {
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(saveNotes, 1000);
+            });
+
+            async function saveNotes() {
+                const content = notesText.innerHTML;
+                try {
+                    const response = await fetch('/notes/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content })
+                    });
+                    const data = await response.json();
+                    if (!data.success) {
+                        console.error('Failed to save note:', data.message);
+                    }
+                } catch (err) {
+                    console.error('Error saving note:', err);
+                }
+            }
       const actionButtons = document.querySelectorAll('.handle-request');
       
       actionButtons.forEach(button => {
@@ -145,15 +119,7 @@
           const requestRow = e.target.closest('tr');
           const requestId = requestRow.dataset.requestId;
           
-          // Confirmation dialog
-          const confirmAction = confirm(`Are you sure you want to ${action} this access request?`);
-          if (!confirmAction) return;
-          
           try {
-            // Disable buttons to prevent multiple clicks
-            const buttons = requestRow.querySelectorAll('button');
-            buttons.forEach(btn => btn.disabled = true);
-            
             const response = await fetch(`/handle-request/${requestId}`, {
               method: 'POST',
               headers: {
@@ -165,42 +131,25 @@
             const data = await response.json();
             
             if (data.success) {
-              // Show success message
-              const statusMessage = document.createElement('div');
-              statusMessage.className = `status-message ${action}-message`;
-              statusMessage.textContent = `Request ${action}d successfully`;
-              requestRow.querySelector('.action-buttons').innerHTML = '';
-              requestRow.querySelector('.action-buttons').appendChild(statusMessage);
+              // Remove the row from the table
+              requestRow.remove();
               
-              // Fade out and remove row after a delay
-              setTimeout(() => {
-                requestRow.style.opacity = '0';
-                setTimeout(() => {
-                  requestRow.remove();
-                  
-                  // Show empty state if no more requests
-                  if (document.querySelectorAll('tbody tr').length === 0) {
-                    const requestsTable = document.querySelector('.requests-table');
-                    requestsTable.innerHTML = `
-                      <div class="empty-state">
-                        <p>You don't have any pending access requests.</p>
-                      </div>
-                    `;
-                  }
-                }, 500);
-              }, 2000);
+              // Show empty state if no more requests
+              if (document.querySelectorAll('tbody tr').length === 0) {
+                document.querySelector('.requests-table').innerHTML = `
+                  <div class="empty-state">
+                    <p>You don't have any pending access requests.</p>
+                  </div>
+                `;
+              }
+              
+              alert(`Request ${action}d successfully`);
             } else {
-              // Re-enable buttons if failed
-              buttons.forEach(btn => btn.disabled = false);
               alert(data.message || 'Failed to process request');
             }
           } catch (err) {
             console.error('Error:', err);
-            alert('An error occurred while processing the request');
-            
-            // Re-enable buttons if error
-            const buttons = requestRow.querySelectorAll('button');
-            buttons.forEach(btn => btn.disabled = false);
+            alert('An error occurred');
           }
         });
       });

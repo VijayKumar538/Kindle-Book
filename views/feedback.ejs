@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <h1>Provide Feedback</h1>
+    <% if (error) { %>
+        <p style="color: red;"><%= error %></p>
+    <% } %>
+    <% if (success) { %>
+        <p style="color: green;"><%= success %></p>
+    <% } %>
+    <form action="/feedback" method="POST">
+        <label for="content">Your Feedback:</label><br>
+        <textarea id="content" name="content" rows="5" cols="50" required></textarea><br>
+        <button type="submit">Submit</button>
+    </form>
+    <a href="/">Back to Home</a>
+</body>
+</html>
