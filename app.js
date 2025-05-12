@@ -804,7 +804,7 @@ app.get('/access-requests', isAuthenticated, async (req, res) => {
     })
       .populate('book', 'title author')
       .populate('requestedBy', 'username email');
-    res.render('accessWELL-requests', { requests: receivedRequests, user: req.user, note: req.note ? req.note.content : '' });
+    res.render('access-requests', { requests: receivedRequests, user: req.user, note: req.note ? req.note.content : '' });
   } catch (err) {
     console.error('Access requests error:', err);
     res.status(500).render('error', { message: 'Failed to load access requests', user: req.user, note: req.note ? req.note.content : '' });
