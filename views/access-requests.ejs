@@ -10,13 +10,17 @@
 <body>
   <header>
     <div class="container">
-      <h1><a href="/">MyLibrary</a></h1>
+      <div class="logo-section">
+        <img src="/images/logo.jpg" alt="BookHive Logo" class="logo">
+      </div>
       <nav>
-        <a href="/library">My Library</a>
-        <a href="/explore">Explore</a>
-        <a href="/my-requests">My Requests</a>
+        <!-- <a href="/library">My Library</a> -->
+        <!-- <a href="/pinned">Pinned Books</a> -->
+        <!-- <a href="/explore">Explore</a>
+        <a href="/my-requests">My Requests</a> -->
         <a href="/access-requests" class="active">Access Requests</a>
-        <a href="/upload">Upload Book</a>
+        <!-- <a href="/upload">Upload</a> -->
+        <a href="/account">Account</a>
         <a href="/logout">Logout</a>
       </nav>
     </div>
@@ -24,7 +28,14 @@
   
   <main class="container">
     <h2>Pending Access Requests</h2>
-    
+
+    <!-- <div class="notes-container">
+      <div class="notes-toggle">✏️</div>
+      <div class="notes-area">
+        <div id="notesText" class="content-editable" contenteditable="true" placeholder="Write your notes here..."><%- note %></div>
+      </div>
+    </div> -->
+
     <% if (requests.length === 0) { %>
       <div class="empty-state">
         <p>You don't have any pending access requests.</p>

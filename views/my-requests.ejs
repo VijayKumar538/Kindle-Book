@@ -4,19 +4,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Requests - MyLibrary</title>
+  <title>My Requests - BookHive</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <header>
     <div class="container">
-      <h1><a href="/">MyLibrary</a></h1>
+      <div class="logo-section">
+        <img src="/images/logo.jpg" alt="BookHive Logo" class="logo">
+      </div>
       <nav>
-        <a href="/library">My Library</a>
-        <a href="/explore">Explore</a>
+        <!-- <a href="/library">My Library</a> -->
+        <!-- <a href="/pinned">Pinned Books</a> -->
+        <!-- <a href="/explore">Explore</a> -->
         <a href="/my-requests" class="active">My Requests</a>
-        <a href="/access-requests">Access Requests</a>
-        <a href="/upload">Upload Book</a>
+        <!-- <a href="/access-requests">Access Requests</a> -->
+        <!-- <a href="/upload">Upload Book</a> -->
+        <a href="/account">Account</a>
         <a href="/logout">Logout</a>
       </nav>
     </div>
@@ -24,7 +28,14 @@
   
   <main class="container">
     <h2>My Access Requests</h2>
-    
+
+    <!-- <div class="notes-container">
+      <div class="notes-toggle">✏️</div>
+      <div class="notes-area">
+        <div id="notesText" class="content-editable" contenteditable="true" placeholder="Write your notes here..."><%- note %></div>
+      </div>
+    </div> -->
+
     <% if (requests.length === 0) { %>
       <div class="empty-state">
         <p>You haven't sent any access requests yet. <a href="/explore">Explore books</a> to find something to read.</p>
@@ -35,24 +46,34 @@
           <thead>
             <tr>
               <th>Book</th>
+              <th>Author</th>
               <th>Owner</th>
               <th>Request Date</th>
+              <th>Response Date</th>
               <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             <% requests.forEach(request => { %>
               <tr>
                 <td><%= request.book ? request.book.title : 'Unknown Book' %></td>
+                <td><%= request.book ? request.book.author : 'Unknown Author' %></td>
                 <td><%= request.bookOwner ? request.bookOwner.username : 'Unknown User' %></td>
                 <td><%= new Date(request.requestDate).toLocaleDateString() %></td>
+                <td><%= request.responseDate ? new Date(request.responseDate).toLocaleDateString() : 'Awaiting Response' %></td>
                 <td>
                   <span class="status-badge status-<%= request.status %>">
                     <%= request.status.charAt(0).toUpperCase() + request.status.slice(1) %>
                   </span>
-                  
+                </td>
+                <td>
                   <% if (request.status === 'approved') { %>
-                    <a href="/read/<%= request.book._id %>" class="btn btn-small btn-primary">Read</a>
+                    <a href="/view/<%= request.book._id %>" class="btn btn-small btn-primary">View</a>
+                  <% } else if (request.status === 'pending') { %>
+                    <span class="pending-message">Awaiting approval</span>
+                  <% } else { %>
+                    <span class="declined-message">Access denied</span>
                   <% } %>
                 </td>
               </tr>
@@ -65,8 +86,35 @@
   
   <footer>
     <div class="container">
-      <p>&copy; 2025 MyLibrary. All rights reserved.</p>
+      <p>&copy; 2025 BookHive. All rights reserved.</p>
     </div>
   </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Format dates for better display
+      const formatDates = () => {
+        const dateElements = document.querySelectorAll('td:nth-child(4), td:nth-child(5)');
+        dateElements.forEach(element => {
+          const dateText = element.textContent.trim();
+          if (dateText !== 'Awaiting Response') {
+            try {
+              const date = new Date(dateText);
+              const formattedDate = date.toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              });
+              element.textContent = formattedDate;
+            } catch (err) {
+              console.error('Error formatting date:', err);
+            }
+          }
+        });
+      };
+      
+      formatDates();
+    });
+  </script>
 </body>
 </html>

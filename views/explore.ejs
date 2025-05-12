@@ -1,115 +1,586 @@
-<!-- views/explore.ejs -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Explore Books - MyLibrary</title>
-  <link rel="stylesheet" href="/css/style.css">
+    <base href="/bookhive/"> <!-- Added to handle subfolder for static assets -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explore Books - BookHive</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/chat.css">
 </head>
 <body>
-  <header>
-    <div class="container">
-      <h1><a href="/">MyLibrary</a></h1>
-      <nav>
-        <a href="/library">My Library</a>
-        <a href="/explore" class="active">Explore</a>
-        <a href="/my-requests">My Requests</a>
-        <a href="/access-requests">Access Requests</a>
-        <a href="/upload">Upload Book</a>
-        <a href="/logout">Logout</a>
-      </nav>
-    </div>
-  </header>
-  
-  <main class="container">
-    <h2>Explore Books</h2>
-    
-    <div class="book-grid">
-      <% if (books.length === 0) { %>
-        <div class="empty-state">
-          <p>No books available at the moment.</p>
-        </div>
-      <% } else { %>
-        <% books.forEach(book => { %>
-          <div class="book-card" data-id="<%= book._id %>">
-            <div class="book-cover">
-              <div class="book-icon">📚</div>
+    <header>
+        <div class="container">
+            <div class="logo-section">
+                <img src="/images/logo.jpg" alt="BookHive Logo" class="logo">
             </div>
-            <div class="book-info">
-              <h3><%= book.title %></h3>
-              <p class="author">by <%= book.author %></p>
-              <p class="owner">Shared by: <%= book.uploadedBy ? book.uploadedBy.username : 'Unknown' %></p>
-              <p class="visibility">
-                <span class="visibility-badge visibility-<%= book.visibility %>">
-                  <%= book.visibility === 'public' ? 'Public' : (book.visibility === 'restricted' ? 'Restricted' : 'Private') %>
-                </span>
-              </p>
-              <div class="book-actions">
-                <% if (book.visibility === 'public') { %>
-                  <a href="/read/<%= book._id %>" class="btn btn-primary">Read</a>
-                <% } else if (book.visibility === 'restricted') { %>
-                  <% if (book.accessList && book.accessList.includes(currentUser)) { %>
-                    <a href="/read/<%= book._id %>" class="btn btn-primary">Read</a>
-                  <% } else { %>
-                    <% if (pendingBookIds.includes(book._id.toString())) { %>
-                      <button class="btn btn-secondary" disabled>Request Pending</button>
-                    <% } else { %>
-                      <button class="btn btn-primary request-access" data-book-id="<%= book._id %>">Request Access</button>
-                    <% } %>
-                  <% } %>
-                <% } else { %>
-                  <span class="btn btn-secondary disabled">Private</span>
-                <% } %>
+            <nav>
+                <a href="/news">NewsToday</a>
+                <a href="/library">My Library</a>
+                <a href="/explore" class="active">Explore</a>
+                <a href="/upload">Upload</a>
+                <a href="/account">Account</a>
+                <a href="/logout">Logout</a>
+            </nav>
+        </div>
+    </header>
+    
+    <main class="container">
+        <h2>Explore Books</h2>
+        
+        <!-- Search functionality -->
+        <div class="search-container">
+            <form id="search-form">
+                <input type="text" id="search-input" placeholder="Search by title, author or tags">
+                <button type="submit" class="btn">Search</button>
+            </form>
+        </div>
+
+        <div class="share-action-buttons">
+            <div class="share-container">
+              <div class="share-toggle" title="Share Library">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+                </svg>
+              </div>
+              <div class="share-options">
+                <button class="share-option" data-platform="whatsapp" title="Share on WhatsApp">
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" class="share-icon">
+                  WhatsApp
+                </button>
+                <button class="share-option" data-platform="instagram" title="Share on Instagram">
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png" alt="Instagram" class="share-icon">
+                  Instagram
+                </button>
+                <button class="share-option" data-platform="x" title="Share on X">
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/6/6f/Logo_of_Twitter.svg" alt="X" class="share-icon">
+                  X
+                </button>
+                <button class="share-option" data-platform="copy" title="Copy Link">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                  </svg>
+                  Copy Link
+                </button>
+              </div>
+              <div id="shareMessage" class="share-message"></div>
+            </div>
+            
+            <div class="notes-container">
+              <div class="notes-toggle" title="Notepad">✏️</div>
+              <div class="notes-area">
+                <div id="notesText" class="content-editable" contenteditable="true" placeholder="Write your notes here..."><%- note %></div>
               </div>
             </div>
+            
+            <div class="feedback-container">
+              <div class="feedback-toggle" title="Provide Feedback">
+                <svg fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+                  <path d="M9 11h2v2H9zm0-4h2v2H9zm4 0h2v2h-2z"/>
+                </svg>
+              </div>
+              <div class="feedback-area">
+                <textarea id="feedbackText" placeholder="Write your feedback here..." required></textarea>
+                <button class="submit-feedback">Submit</button>
+                <div id="feedbackMessage" class="feedback-message"></div>
+              </div>
+            </div>
+        </div>
+
+        <!-- All Books Section -->
+        <section class="all-books">
+            <h3>All Books</h3>
+            <div class="book-grid" id="books-container">
+                <% if (books && books.length > 0) { %>
+                    <% books.forEach(book => { %>
+                        <div class="book-card" data-id="<%= book._id %>">
+                            <div class="book-cover">
+                                <img src="/thumbnail/<%= book._id %>" alt="<%= book.title %> cover" class="thumbnail" onerror="this.src='/images/default-thumbnail.png'">
+                                <div class="pin-icon <%= pinnedBooks.includes(book._id.toString()) ? 'pinned' : '' %>" data-book-id="<%= book._id %>">
+                                    <span class="pin-count"><%= book.pinCount || 0 %></span>
+                                    📌
+                                </div>
+                            </div>
+                            <div class="book-info">
+                                <h3><%= book.title %></h3>
+                                <p class="author">by <%= book.author %></p>
+                                <p class="visibility">
+                                    <span class="visibility-badge visibility-<%= book.visibility %>">
+                                        <%= book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1) %>
+                                    </span>
+                                </p>
+                                <div class="book-actions">
+                                    <% if (book.visibility === 'public' || (book.visibility === 'restricted' && book.accessList.includes(currentUser))) { %>
+                                        <a href="/view/<%= book._id %>" class="btn btn-primary">View</a>
+                                    <% } else if (book.visibility === 'restricted') { %>
+                                        <% if (pendingBookIds.includes(book._id.toString())) { %>
+                                            <button class="btn btn-secondary disabled" disabled>Request Sent</button>
+                                        <% } else { %>
+                                            <button class="btn btn-secondary request-access" data-book-id="<%= book._id %>">Request Access</button>
+                                        <% } %>
+                                    <% } %>
+                                </div>
+                            </div>
+                        </div>
+                    <% }) %>
+                <% } else { %>
+                    <div class="empty-state">
+                        <p>No books available.</p>
+                    </div>
+                <% } %>
+            </div>
+        </section>
+    </main>
+
+    <% if (user) { %>
+        <div class="chat-icon" onclick="toggleChat()">
+          <img src="/images/chat-icon.png" alt="Chat" />
+        </div>
+        <div class="chat-window" id="chatWindow">
+          <div class="chat-header">
+            <h3><%= user.profession.charAt(0).toUpperCase() + user.profession.slice(1) %> Group Chat</h3>
+            <button onclick="toggleChat()">Close</button>
           </div>
-        <% }) %>
-      <% } %>
-    </div>
-  </main>
-  
-  <footer>
-    <div class="container">
-      <p>&copy; 2025 MyLibrary. All rights reserved.</p>
-    </div>
-  </footer>
-  
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      const requestButtons = document.querySelectorAll('.request-access');
-      
-      requestButtons.forEach(button => {
-        button.addEventListener('click', async (e) => {
-          const bookId = e.target.dataset.bookId;
-          
-          try {
-            const response = await fetch(`/request-access/${bookId}`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-              // Update UI to show pending
-              e.target.textContent = 'Request Pending';
-              e.target.disabled = true;
-              e.target.classList.remove('btn-primary');
-              e.target.classList.add('btn-secondary');
-              alert('Access request sent successfully');
+          <div class="chat-messages" id="chatMessages"></div>
+          <div class="chat-input">
+            <input type="text" id="chatInput" placeholder="Type a message..." />
+            <button onclick="sendMessage()">Send</button>
+          </div>
+        </div>
+    <% } %>
+
+    <footer>
+        <div class="container">
+            <p>© 2025 BookHive. All rights reserved.</p>
+        </div>
+    </footer>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const notesToggle = document.querySelector('.notes-toggle');
+            const notesArea = document.querySelector('.notes-area');
+            const notesText = document.getElementById('notesText');
+            let typingTimer;
+
+            if (notesToggle && notesArea) {
+                console.log('Notes toggle and area found');
+                notesToggle.addEventListener('click', () => {
+                    console.log('Notes toggle clicked');
+                    notesArea.classList.toggle('active');
+                    feedbackArea.classList.remove('active'); // Close feedback area if open
+                    shareOptions.classList.remove('active'); // Close share options if open
+                });
             } else {
-              alert(data.message || 'Failed to send request');
+                console.log('Notes toggle or area not found');
             }
-          } catch (err) {
-            console.error('Error:', err);
-            alert('An error occurred while sending the request');
-          }
+
+            notesText.addEventListener('input', () => {
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(saveNotes, 1000);
+            });
+
+            async function saveNotes() {
+                const content = notesText.innerHTML;
+                try {
+                    const response = await fetch('/notes/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ content })
+                    });
+                    const data = await response.json();
+                    if (!data.success) {
+                        console.error('Failed to save note:', data.message);
+                    }
+                } catch (err) {
+                    console.error('Error saving note:', err);
+                }
+            }
+
+            // Feedback functionality
+            const feedbackToggle = document.querySelector('.feedback-toggle');
+            const feedbackArea = document.querySelector('.feedback-area');
+            const feedbackText = document.getElementById('feedbackText');
+            const feedbackMessage = document.getElementById('feedbackMessage');
+            const submitFeedbackBtn = document.querySelector('.submit-feedback');
+
+            if (feedbackToggle && feedbackArea) {
+                console.log('Feedback toggle and area found');
+                feedbackToggle.addEventListener('click', () => {
+                    console.log('Feedback toggle clicked');
+                    feedbackArea.classList.toggle('active');
+                    notesArea.classList.remove('active'); // Close notes area if open
+                    shareOptions.classList.remove('active'); // Close share options if open
+                });
+
+                submitFeedbackBtn.addEventListener('click', async () => {
+                    const content = feedbackText.value.trim();
+                    if (!content) {
+                        feedbackMessage.textContent = 'Please enter your feedback.';
+                        feedbackMessage.className = 'feedback-message error';
+                        return;
+                    }
+
+                    feedbackMessage.textContent = 'Submitting...';
+                    feedbackMessage.className = 'feedback-message';
+
+                    try {
+                        const response = await fetch('/feedback', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json'
+                            },
+                            body: JSON.stringify({ content })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! Status: ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        if (data.success) {
+                            feedbackMessage.textContent = 'Feedback submitted successfully!';
+                            feedbackMessage.className = 'feedback-message success';
+                            feedbackText.value = ''; // Clear the textarea
+                            feedbackArea.classList.remove('active'); // Close the feedback area
+                        } else {
+                            feedbackMessage.textContent = data.message || 'Failed to submit feedback.';
+                            feedbackMessage.className = 'feedback-message error';
+                        }
+                    } catch (err) {
+                        feedbackMessage.textContent = `Error submitting feedback: ${err.message}`;
+                        feedbackMessage.className = 'feedback-message error';
+                        console.error('Error submitting feedback:', err);
+                    }
+                });
+            } else {
+                console.log('Feedback toggle or area not found');
+            }
+
+            // Share functionality
+            const shareToggle = document.querySelector('.share-toggle');
+            const shareOptions = document.querySelector('.share-options');
+            const shareMessage = document.getElementById('shareMessage');
+            const currentUrl = window.location.href;
+
+            if (shareToggle && shareOptions) {
+                shareToggle.addEventListener('click', () => {
+                    shareOptions.classList.toggle('active');
+                    notesArea.classList.remove('active'); // Close notes area if open
+                    feedbackArea.classList.remove('active'); // Close feedback area if open
+                });
+
+                // Close share options when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!shareToggle.contains(e.target) && !shareOptions.contains(e.target)) {
+                        shareOptions.classList.remove('active');
+                    }
+                });
+
+                const shareButtons = shareOptions.querySelectorAll('.share-option');
+                shareButtons.forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent closing the dropdown
+                        const platform = button.dataset.platform;
+                        let url = '';
+
+                        switch (platform) {
+                            case 'whatsapp':
+                                url = `https://wa.me/?text=${encodeURIComponent('Check out my library on BookHive: ' + currentUrl)}`;
+                                window.open(url, '_blank');
+                                break;
+                            case 'instagram':
+                                url = `https://www.instagram.com/direct/new/?text=${encodeURIComponent('Check out my library on BookHive: ' + currentUrl)}`;
+                                window.open(url, '_blank');
+                                break;
+                            case 'x':
+                                url = `https://twitter.com/intent/tweet?text=Check out my library on BookHive: ${encodeURIComponent(currentUrl)}`;
+                                window.open(url, '_blank');
+                                break;
+                            case 'copy':
+                                navigator.clipboard.writeText(currentUrl).then(() => {
+                                    shareMessage.textContent = 'Link copied to clipboard!';
+                                    shareMessage.className = 'share-message success';
+                                    setTimeout(() => {
+                                        shareMessage.textContent = '';
+                                        shareMessage.className = 'share-message';
+                                    }, 2000);
+                                }).catch(err => {
+                                    shareMessage.textContent = 'Failed to copy link.';
+                                    shareMessage.className = 'share-message error';
+                                    console.error('Copy error:', err);
+                                });
+                                break;
+                        }
+                        shareOptions.classList.remove('active'); // Close dropdown after action
+                    });
+                });
+            }
+
+            const booksContainer = document.getElementById('books-container');
+            const searchForm = document.getElementById('search-form');
+            const searchInput = document.getElementById('search-input');
+
+            // Check session status
+            async function checkSession() {
+                try {
+                    const response = await fetch('/account/storage-info', {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    if (!response.ok || response.status === 401) {
+                        console.warn('Session check failed, redirecting to login');
+                        window.location.href = '/login';
+                        return false;
+                    }
+                    return true;
+                } catch (err) {
+                    console.error('Session check error:', err);
+                    return false;
+                }
+            }
+
+            // Event delegation for pin/unpin
+            if (booksContainer) {
+                booksContainer.addEventListener('click', async (e) => {
+                    const pinIcon = e.target.closest('.pin-icon');
+                    if (!pinIcon) return;
+
+                    const bookId = pinIcon.dataset.bookId;
+                    console.log(`Pin/Unpin: Initiating for bookId=${bookId}`);
+
+                    const isAuthenticated = await checkSession();
+                    if (!isAuthenticated) {
+                        alert('Session expired. Please log in again.');
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(`/book/${bookId}/pin?t=${Date.now()}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+
+                        console.log(`Pin/Unpin: Response status=${response.status}, ok=${response.ok}`);
+
+                        if (!response.ok) {
+                            const contentType = response.headers.get('Content-Type');
+                            let errorText = await response.text();
+                            if (contentType.includes('text/html')) {
+                                errorText = 'Received HTML response (possibly a login redirect)';
+                            }
+                            throw new Error(`HTTP ${response.status}: ${errorText}`);
+                        }
+
+                        const data = await response.json();
+                        if (data.success) {
+                            const pinCountElement = pinIcon.querySelector('.pin-count');
+                            pinCountElement.textContent = data.pinCount;
+                            if (data.isPinned) {
+                                pinIcon.classList.add('pinned');
+                            } else {
+                                pinIcon.classList.remove('pinned');
+                            }
+                        } else {
+                            alert(`Failed to update pin status: ${data.message}`);
+                        }
+                    } catch (err) {
+                        console.error(`Pin/Unpin: Error for bookId=${bookId}:`, err);
+                        alert(`Error updating pin status: ${err.message}`);
+                    }
+                });
+            }
+
+            // Request access
+            if (booksContainer) {
+                booksContainer.addEventListener('click', async (e) => {
+                    const requestBtn = e.target.closest('.request-access');
+                    if (!requestBtn) return;
+
+                    const bookId = requestBtn.dataset.bookId;
+                    console.log(`Request Access: Initiating for bookId=${bookId}`);
+
+                    const isAuthenticated = await checkSession();
+                    if (!isAuthenticated) {
+                        alert('Session expired. Please log in again.');
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(`/request-access?t=${Date.now()}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: JSON.stringify({ bookId })
+                        });
+
+                        console.log(`Request Access: Response status=${response.status}, ok=${response.ok}`);
+
+                        if (!response.ok) {
+                            const contentType = response.headers.get('Content-Type');
+                            let errorText = await response.text();
+                            if (contentType.includes('text/html')) {
+                                errorText = 'Received HTML response (possibly a login redirect)';
+                            }
+                            throw new Error(`HTTP ${response.status}: ${errorText}`);
+                        }
+
+                        const data = await response.json();
+                        if (data.success) {
+                            requestBtn.textContent = 'Request Sent';
+                            requestBtn.disabled = true;
+                            requestBtn.classList.add('disabled');
+                            alert('Access request sent successfully!');
+                        } else {
+                            alert(`Failed to request access: ${data.message}`);
+                        }
+                    } catch (err) {
+                        console.error(`Request Access: Error for bookId=${bookId}:`, err);
+                        alert(`Error requesting access: ${err.message}`);
+                    }
+                });
+            }
+
+            // Search functionality
+            searchForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const query = searchInput.value.trim();
+                if (!query) return;
+
+                console.log(`Search: Query="${query}"`);
+
+                try {
+                    const response = await fetch(`/explore/search?query=${encodeURIComponent(query)}&t=${Date.now()}`, {
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    console.log(`Search: Response status=${response.status}, ok=${response.ok}`);
+
+                    if (!response.ok) {
+                        const contentType = response.headers.get('Content-Type');
+                        let errorText = await response.text();
+                        if (contentType.includes('text/html')) {
+                            errorText = 'Received HTML response (possibly a login redirect)';
+                        }
+                        throw new Error(`HTTP ${response.status}: ${errorText}`);
+                    }
+
+                    const data = await response.json();
+                    booksContainer.innerHTML = '';
+
+                    if (!data.books || data.books.length === 0) {
+                        booksContainer.innerHTML = `
+                            <div class="empty-state">
+                                <p>No books found matching your search.</p>
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    data.books.forEach(book => {
+                        const isPinned = <%= JSON.stringify(pinnedBooks) %>.includes(book._id.toString());
+                        const bookCard = `
+                            <div class="book-card" data-id="${book._id}">
+                                <div class="book-cover">
+                                    <img src="/thumbnail/${book._id}" alt="${book.title} cover" class="thumbnail" onerror="this.src='/images/default-thumbnail.png'">
+                                    <div class="pin-icon ${isPinned ? 'pinned' : ''}" data-book-id="${book._id}">
+                                        <span class="pin-count">${book.pinCount || 0}</span>
+                                        📌
+                                    </div>
+                                </div>
+                                <div class="book-info">
+                                    <h3>${book.title}</h3>
+                                    <p class="author">by ${book.author}</p>
+                                    <p class="visibility">
+                                        <span class="visibility-badge visibility-${book.visibility}">
+                                            ${book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1)}
+                                        </span>
+                                    </p>
+                                    <div class="book-actions">
+                                        ${book.visibility === 'public' || (book.visibility === 'restricted' && book.accessList.includes('<%= currentUser %>')) ? `<a href="/view/${book._id}" class="btn btn-primary">View</a>` : ''}
+                                        ${book.visibility === 'restricted' && !book.accessList.includes('<%= currentUser %>') && <%= JSON.stringify(pendingBookIds) %>.includes(book._id.toString()) ? `<button class="btn btn-secondary disabled" disabled>Request Sent</button>` : ''}
+                                        ${book.visibility === 'restricted' && !book.accessList.includes('<%= currentUser %>') && !<%= JSON.stringify(pendingBookIds) %>.includes(book._id.toString()) ? `<button class="btn btn-secondary request-access" data-book-id="${book._id}">Request Access</button>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        booksContainer.innerHTML += bookCard;
+                    });
+                } catch (err) {
+                    console.error(`Search: Error for query="${query}":`, err);
+                    booksContainer.innerHTML = `
+                        <div class="empty-state">
+                            <p>Error searching books: ${err.message}</p>
+                        </div>
+                    `;
+                }
+            });
         });
-      });
-    });
-  </script>
+    </script>
+
+    <% if (user) { %>
+        <script src="/socket.io/socket.io.js"></script>
+        <script>
+        const socket = io();
+        const userId = '<%= user._id %>';
+        const profession = '<%= user.profession %>';
+
+        socket.emit('joinProfession', { userId, profession });
+
+        socket.on('chatHistory', (messages) => {
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.innerHTML = '';
+            messages.forEach(msg => {
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('message');
+                messageElement.innerHTML = `<strong>${msg.user.username}</strong>: ${msg.content} <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>`;
+                chatMessages.appendChild(messageElement);
+            });
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+
+        socket.on('chatMessage', (msg) => {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            messageElement.innerHTML = `<strong>${msg.user.username}</strong>: ${msg.content} <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>`;
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+
+        socket.on('notification', (notification) => {
+            alert(notification.message);
+        });
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const content = input.value.trim();
+            if (content) {
+                socket.emit('chatMessage', { userId, profession, content });
+                input.value = '';
+            }
+        }
+
+        function toggleChat() {
+            const chatWindow = document.getElementById('chatWindow');
+            chatWindow.classList.toggle('open');
+        }
+
+        document.getElementById('chatInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+    <% } %>
 </body>
 </html>

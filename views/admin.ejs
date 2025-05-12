@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard</title>
+  <!-- Quill CDN -->
+  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f4f4f4;
+    }
+    h1, h2, h3 {
+      color: #333;
+    }
+    .section {
+      margin-bottom: 40px;
+      padding: 20px;
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    .form-group input[type="file"] {
+      padding: 3px;
+    }
+    #news-editor-container {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    #news-editor {
+      min-height: 200px;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    button:disabled {
+      background-color: #6c757d;
+      cursor: not-allowed;
+    }
+    .message {
+      padding: 10px;
+      margin-bottom: 10px;
+      border-left: 4px solid #007bff;
+      background-color: #f8f9fa;
+    }
+    .success {
+      color: green;
+      margin-bottom: 15px;
+      padding: 10px;
+      background-color: #d4edda;
+      border-radius: 4px;
+    }
+    .error {
+      color: red;
+      margin-bottom: 15px;
+      padding: 10px;
+      background-color: #f8d7da;
+      border-radius: 4px;
+    }
+    .logout {
+      margin-bottom: 20px;
+    }
+    .logout a {
+      color: #007bff;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    .logout a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h1>Admin Dashboard</h1>
+  
+  <div class="logout">
+    <a href="/logout">Logout</a>
+  </div>
+
+  <% if (success) { %>
+    <div class="success"><%= success %></div>
+  <% } %>
+  <% if (error) { %>
+    <div class="error"><%= error %></div>
+  <% } %>
+
+  <!-- Post News Section -->
+  <div class="section">
+    <h2>Post News Update</h2>
+    <form id="news-form" action="/admin/news/post" method="POST" enctype="multipart/form-data">
+      <div class="form-group">
+        <label for="title">Title:</label>
+        <input type="text" id="title" name="title" required>
+      </div>
+      <div class="form-group">
+        <label for="content">Content:</label>
+        <div id="news-editor-container">
+          <div id="news-editor"></div>
+        </div>
+        <input type="hidden" id="content" name="content">
+      </div>
+      <div class="form-group">
+        <label for="image">Image (Optional, JPEG/PNG, Max 5MB):</label>
+        <input type="file" id="image" name="image" accept="image/jpeg,image/png">
+      </div>
+      <button type="submit" id="submit-news">Post News</button>
+    </form>
+  </div>
+
+  <!-- Profession Conversations Section -->
+  <div class="section">
+    <h2>All Profession Conversations</h2>
+    <% for (const profession in conversations) { %>
+      <h3><%= profession.charAt(0).toUpperCase() + profession.slice(1) %> Chat</h3>
+      <% if (conversations[profession].length === 0) { %>
+        <p>No messages yet.</p>
+      <% } else { %>
+        <% conversations[profession].forEach(message => { %>
+          <div class="message">
+            <strong><%= message.user.username %></strong>: <%= message.content %>
+            <span style="float: right;"><%= new Date(message.timestamp).toLocaleString() %></span>
+          </div>
+        <% }) %>
+      <% } %>
+    <% } %>
+  </div>
+
+  <!-- Quill JS -->
+  <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+  <script>
+    // Initialize Quill Editor
+    const quill = new Quill('#news-editor', {
+      theme: 'snow',
+      modules: {
+        toolbar: [
+          ['bold', 'italic', 'underline'],
+          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+          ['link'],
+          ['clean']
+        ]
+      },
+      placeholder: 'Write your news content here...'
+    });
+
+    // Handle Form Submission
+    const form = document.getElementById('news-form');
+    const submitButton = document.getElementById('submit-news');
+    form.addEventListener('submit', function(e) {
+      // Update hidden input with Quill content
+      document.getElementById('content').value = quill.root.innerHTML;
+      submitButton.disabled = true;
+      submitButton.textContent = 'Posting...';
+    });
+
+    // Re-enable button on error
+    <% if (error) { %>
+      submitButton.disabled = false;
+      submitButton.textContent = 'Post News';
+    <% } %>
+  </script>
+</body>
+</html>

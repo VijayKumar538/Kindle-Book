@@ -4,13 +4,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login - MyLibrary</title>
+  <title>Login - BookHive</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <header>
     <div class="container">
-      <h1><a href="/">MyLibrary</a></h1>
+      <div class="logo-section">
+        <img src="/images/logo.jpg" alt="BookHive Logo" class="logo">
+      </div>
     </div>
   </header>
   
@@ -18,9 +20,9 @@
     <h2>Login to Your Account</h2>
     
     <% if (typeof error !== 'undefined') { %>
-      <div class="alert alert-error">
+      <!-- <div class="alert alert-error">
         <%= error %>
-      </div>
+      </div> -->
     <% } %>
     
     <form action="/login" method="POST">
@@ -44,7 +46,7 @@
   
   <footer>
     <div class="container">
-      <p>&copy; 2025 MyLibrary. All rights reserved.</p>
+      <p>&copy; 2025 BookHive. All rights reserved.</p>
     </div>
   </footer>
 </body>

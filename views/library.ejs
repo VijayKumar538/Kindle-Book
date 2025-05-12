@@ -1,82 +1,24 @@
-<!-- views/library.ejs -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Library - MyLibrary</title>
-  <link rel="stylesheet" href="/css/style.css">
-  <style>
-    .visibility-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: 0.8em;
-      margin-bottom: 8px;
-    }
-    .visibility-private {
-      background-color: #f0f0f0;
-      color: #333;
-    }
-    .visibility-public {
-      background-color: #d4edda;
-      color: #155724;
-    }
-    .visibility-restricted {
-      background-color: #fff3cd;
-      color: #856404;
-    }
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-      z-index: 1000;
-    }
-    .modal-content {
-      background-color: white;
-      margin: 10% auto;
-      padding: 20px;
-      border-radius: 5px;
-      width: 80%;
-      max-width: 500px;
-    }
-    .close {
-      float: right;
-      font-size: 24px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    .access-list {
-      margin-top: 10px;
-      max-height: 200px;
-      overflow-y: auto;
-    }
-    .access-list-item {
-      padding: 8px;
-      border-bottom: 1px solid #eee;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .visibility-controls {
-      margin-top: 10px;
-    }
-  </style>
+  <title>My Library - BookHive</title>
+  <link rel="stylesheet" href="/css/style.css?v=20241024232623">
+  <link rel="stylesheet" href="/css/chat.css">
 </head>
 <body>
   <header>
     <div class="container">
-      <h1><a href="/">MyLibrary</a></h1>
+      <div class="logo-section">
+        <img src="/images/logo.jpg" alt="BookHive Logo" class="logo">
+      </div>
       <nav>
+        <a href="/news">NewsToday</a>
         <a href="/library" class="active">My Library</a>
         <a href="/explore">Explore</a>
-        <a href="/my-requests">My Requests</a>
-        <a href="/access-requests">Access Requests</a>
-        <a href="/upload">Upload Book</a>
+        <a href="/upload">Upload</a>
+        <a href="/account">Account</a>
         <a href="/logout">Logout</a>
       </nav>
     </div>
@@ -85,7 +27,66 @@
   <main class="container">
     <h2>My Library</h2>
     
-    <div class="book-grid">
+    <div class="search-container">
+      <form>
+        <input type="text" id="searchInput" placeholder="Search your library..." required>
+        <button type="button" id="searchButton" class="btn btn-primary">Search</button>
+      </form>
+    </div>
+    
+    <div class="share-action-buttons">
+      <div class="share-container">
+        <div class="share-toggle" title="Share Library">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+          </svg>
+        </div>
+        <div class="share-options">
+          <button class="share-option" data-platform="whatsapp" title="Share on WhatsApp">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" class="share-icon">
+            WhatsApp
+          </button>
+          <button class="share-option" data-platform="instagram" title="Share on Instagram">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png" alt="Instagram" class="share-icon">
+            Instagram
+          </button>
+          <button class="share-option" data-platform="x" title="Share on X">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6f/Logo_of_Twitter.svg" alt="X" class="share-icon">
+            X
+          </button>
+          <button class="share-option" data-platform="copy" title="Copy Link">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+            </svg>
+            Copy Link
+          </button>
+        </div>
+        <div id="shareMessage" class="share-message"></div>
+      </div>
+      
+      <div class="notes-container">
+        <div class="notes-toggle" title="Notepad">✏️</div>
+        <div class="notes-area">
+          <div id="notesText" class="content-editable" contenteditable="true"><%- note %></div>
+        </div>
+      </div>
+      
+      <div class="feedback-container">
+        <div class="feedback-toggle" title="Provide Feedback">
+          <svg fill="currentColor" viewBox="0 0 24 24">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+            <path d="M9 11h2v2H9zm0-4h2v2H9zm4 0h2v2h-2z"/>
+          </svg>
+        </div>
+        <div class="feedback-area">
+          <textarea id="feedbackText" placeholder="Write your feedback here..." required></textarea>
+          <button class="submit-feedback">Submit</button>
+          <div id="feedbackMessage" class="feedback-message"></div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="book-grid" id="bookGrid">
       <% if (books.length === 0) { %>
         <div class="empty-state">
           <p>Your library is empty. <a href="/upload">Upload your first book</a> to get started.</p>
@@ -94,20 +95,17 @@
         <% books.forEach(book => { %>
           <div class="book-card" data-id="<%= book._id %>">
             <div class="book-cover">
-              <div class="book-icon">📚</div>
+              <img src="/thumbnail/<%= book._id %>" alt="<%= book.title %> cover" class="thumbnail" onerror="this.src='/images/default-thumbnail.png'">
             </div>
             <div class="book-info">
               <h3><%= book.title %></h3>
-              <p class="author">by <%= book.author %></p>
+              <p class="author"><%= book.author %></p>
               <span class="visibility-badge visibility-<%= book.visibility %>">
-                <%= book.visibility ? (book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1)) : 'Private' %>
+                <%= book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1) %>
               </span>
-              <p class="upload-date">Uploaded: <%= new Date(book.uploadDate).toLocaleDateString() %></p>
               <div class="book-actions">
-                <a href="/read/<%= book._id %>" class="btn btn-primary">Read</a>
-                <button class="btn btn-secondary manage-sharing" data-book-id="<%= book._id %>" data-visibility="<%= book.visibility %>">
-                  Manage Sharing
-                </button>
+                <a href="/view/<%= book._id %>" class="btn btn-primary">Read</a>
+                <button class="btn btn-secondary manage-sharing" data-book-id="<%= book._id %>" data-visibility="<%= book.visibility %>">Share</button>
                 <button class="btn btn-danger delete-book">Delete</button>
               </div>
             </div>
@@ -117,93 +115,274 @@
     </div>
   </main>
   
-  <!-- Sharing Management Modal -->
   <div id="sharingModal" class="modal">
     <div class="modal-content">
-      <span class="close">&times;</span>
-      <h3>Manage Book Sharing</h3>
+      <span class="close">×</span>
+      <h3>Manage Sharing</h3>
       <p id="bookTitle"></p>
-      
       <div class="visibility-controls">
         <label for="visibilitySelect">Visibility:</label>
         <select id="visibilitySelect">
-          <option value="private">Private (Only you)</option>
-          <option value="public">Public (Anyone)</option>
-          <option value="restricted">Restricted (Selected users)</option>
+          <option value="private">Private</option>
+          <option value="public">Public</option>
+          <option value="restricted">Restricted</option>
         </select>
       </div>
-      
       <div id="accessListSection" style="display: none;">
         <h4>Users with Access</h4>
-        <div class="access-list" id="accessList">
-          <!-- Access list will be populated dynamically -->
-        </div>
+        <div class="access-list" id="accessList"></div>
       </div>
-      
-      <div class="modal-actions" style="margin-top: 20px;">
-        <button id="saveVisibility" class="btn btn-primary">Save Changes</button>
-      </div>
+      <button id="saveVisibility" class="btn btn-primary">Save</button>
     </div>
   </div>
   
+  <% if (user) { %>
+    <div class="chat-icon" onclick="toggleChat()">
+      <img src="/images/chat-icon.png" alt="Chat" />
+    </div>
+    <div class="chat-window" id="chatWindow">
+      <div class="chat-header">
+        <h3><%= user.profession.charAt(0).toUpperCase() + user.profession.slice(1) %> Group Chat</h3>
+        <button onclick="toggleChat()">Close</button>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input">
+        <input type="text" id="chatInput" placeholder="Type a message..." />
+        <button onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+  <% } %>
+  
   <footer>
     <div class="container">
-      <p>&copy; 2025 MyLibrary. All rights reserved.</p>
+      <p>© 2025 BookHive. All rights reserved.</p>
     </div>
   </footer>
   
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      // Delete book functionality
+      // Notes functionality
+      const notesToggle = document.querySelector('.notes-toggle');
+      const notesArea = document.querySelector('.notes-area');
+      const notesText = document.getElementById('notesText');
+      let typingTimer;
+
+      if (notesToggle && notesArea) {
+        console.log('Notes toggle and area found');
+        notesToggle.addEventListener('click', () => {
+          console.log('Notes toggle clicked');
+          notesArea.classList.toggle('active');
+          feedbackArea.classList.remove('active'); // Close feedback area if open
+          shareOptions.classList.remove('active'); // Close share options if open
+          
+          // Set placeholder if content is empty
+          if (!notesText.innerHTML.trim()) {
+            notesText.innerHTML = '<span style="color: #999;">Write your notes here...</span>';
+          }
+        });
+      } else {
+        console.log('Notes toggle or area not found');
+      }
+
+      notesText.addEventListener('input', () => {
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(saveNotes, 1000);
+        
+        // Remove placeholder when user starts typing
+        if (notesText.innerHTML.trim() === '<span style="color: #999;">Write your notes here...</span>') {
+          notesText.innerHTML = '';
+        }
+      });
+
+      notesText.addEventListener('focus', () => {
+        // Remove placeholder when focused
+        if (notesText.innerHTML.trim() === '<span style="color: #999;">Write your notes here...</span>') {
+          notesText.innerHTML = '';
+        }
+      });
+
+      notesText.addEventListener('blur', () => {
+        // Restore placeholder if content is empty
+        if (!notesText.innerHTML.trim()) {
+          notesText.innerHTML = '<span style="color: #999;">Write your notes here...</span>';
+        }
+      });
+
+      async function saveNotes() {
+        const content = notesText.innerHTML;
+        try {
+          const response = await fetch('/notes/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content })
+          });
+          const data = await response.json();
+          if (!data.success) {
+            console.error('Failed to save note:', data.message);
+          }
+        } catch (err) {
+          console.error('Error saving note:', err);
+        }
+      }
+
+      // Feedback functionality
+      const feedbackToggle = document.querySelector('.feedback-toggle');
+      const feedbackArea = document.querySelector('.feedback-area');
+      const feedbackText = document.getElementById('feedbackText');
+      const feedbackMessage = document.getElementById('feedbackMessage');
+      const submitFeedbackBtn = document.querySelector('.submit-feedback');
+
+      if (feedbackToggle && feedbackArea) {
+        console.log('Feedback toggle and area found');
+        feedbackToggle.addEventListener('click', () => {
+          console.log('Feedback toggle clicked');
+          feedbackArea.classList.toggle('active');
+          notesArea.classList.remove('active'); // Close notes area if open
+          shareOptions.classList.remove('active'); // Close share options if open
+        });
+
+        submitFeedbackBtn.addEventListener('click', async () => {
+          const content = feedbackText.value.trim();
+          if (!content) {
+            feedbackMessage.textContent = 'Please enter your feedback.';
+            feedbackMessage.className = 'feedback-message error';
+            return;
+          }
+
+          feedbackMessage.textContent = 'Submitting...';
+          feedbackMessage.className = 'feedback-message';
+
+          try {
+            const response = await fetch('/feedback', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({ content })
+            });
+
+            if (!response.ok) {
+              throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (data.success) {
+              feedbackMessage.textContent = 'Feedback submitted successfully!';
+              feedbackMessage.className = 'feedback-message success';
+              feedbackText.value = ''; // Clear the textarea
+              feedbackArea.classList.remove('active'); // Close the feedback area
+            } else {
+              feedbackMessage.textContent = data.message || 'Failed to submit feedback.';
+              feedbackMessage.className = 'feedback-message error';
+            }
+          } catch (err) {
+            feedbackMessage.textContent = `Error submitting feedback: ${err.message}`;
+            feedbackMessage.className = 'feedback-message error';
+            console.error('Error submitting feedback:', err);
+          }
+        });
+      } else {
+        console.log('Feedback toggle or area not found');
+      }
+
+      // Share functionality
+      const shareToggle = document.querySelector('.share-toggle');
+      const shareOptions = document.querySelector('.share-options');
+      const shareMessage = document.getElementById('shareMessage');
+      const currentUrl = window.location.href;
+
+      if (shareToggle && shareOptions) {
+        shareToggle.addEventListener('click', () => {
+          shareOptions.classList.toggle('active');
+          notesArea.classList.remove('active'); // Close notes area if open
+          feedbackArea.classList.remove('active'); // Close feedback area if open
+        });
+
+        // Close share options when clicking outside
+        document.addEventListener('click', (e) => {
+          if (!shareToggle.contains(e.target) && !shareOptions.contains(e.target)) {
+            shareOptions.classList.remove('active');
+          }
+        });
+
+        const shareButtons = shareOptions.querySelectorAll('.share-option');
+        shareButtons.forEach(button => {
+          button.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent closing the dropdown
+            const platform = button.dataset.platform;
+            let url = '';
+
+            switch (platform) {
+              case 'whatsapp':
+                url = `https://wa.me/?text=${encodeURIComponent('Check out my library on BookHive: ' + currentUrl)}`;
+                window.open(url, '_blank');
+                break;
+              case 'instagram':
+                url = `https://www.instagram.com/direct/new/?text=${encodeURIComponent('Check out my library on BookHive: ' + currentUrl)}`;
+                window.open(url, '_blank');
+                break;
+              case 'x':
+                url = `https://twitter.com/intent/tweet?text=Check out my library on BookHive: ${encodeURIComponent(currentUrl)}`;
+                window.open(url, '_blank');
+                break;
+              case 'copy':
+                navigator.clipboard.writeText(currentUrl).then(() => {
+                  shareMessage.textContent = 'Link copied to clipboard!';
+                  shareMessage.className = 'share-message success';
+                  setTimeout(() => {
+                    shareMessage.textContent = '';
+                    shareMessage.className = 'share-message';
+                  }, 2000);
+                }).catch(err => {
+                  shareMessage.textContent = 'Failed to copy link.';
+                  shareMessage.className = 'share-message error';
+                  console.error('Copy error:', err);
+                });
+                break;
+            }
+            shareOptions.classList.remove('active'); // Close dropdown after action
+          });
+        });
+      }
+
+      // Existing functionality (delete, share, search)
       const deleteButtons = document.querySelectorAll('.delete-book');
-      
       deleteButtons.forEach(button => {
         button.addEventListener('click', async (e) => {
           const bookCard = e.target.closest('.book-card');
           const bookId = bookCard.dataset.id;
-          
-          if (confirm('Are you sure you want to delete this book? This action cannot be undone.')) {
+          if (confirm('Are you sure you want to delete this book?')) {
             try {
-              const response = await fetch(`/book/${bookId}`, {
-                method: 'DELETE'
-              });
-              
+              const response = await fetch(`/book/${bookId}`, { method: 'DELETE' });
               const data = await response.json();
-              
               if (data.success) {
                 bookCard.remove();
-                
-                // If all books are removed, show empty state
                 if (document.querySelectorAll('.book-card').length === 0) {
-                  const bookGrid = document.querySelector('.book-grid');
-                  bookGrid.innerHTML = `
+                  document.querySelector('.book-grid').innerHTML = `
                     <div class="empty-state">
                       <p>Your library is empty. <a href="/upload">Upload your first book</a> to get started.</p>
                     </div>
                   `;
                 }
               } else {
-                alert('Failed to delete book');
+                alert(data.message || 'Failed to delete book');
               }
             } catch (err) {
-              console.error('Error:', err);
-              alert('An error occurred');
+              alert('Error deleting book');
             }
           }
         });
       });
-      
-      // Sharing management functionality
+
       const sharingButtons = document.querySelectorAll('.manage-sharing');
       const modal = document.getElementById('sharingModal');
       const closeBtn = document.querySelector('.close');
       const visibilitySelect = document.getElementById('visibilitySelect');
       const accessListSection = document.getElementById('accessListSection');
       const accessList = document.getElementById('accessList');
-      const saveBtn = document.getElementById('saveVisibility');
       let currentBookId = null;
-      
-      // Open modal when clicking Manage Sharing
+
       sharingButtons.forEach(button => {
         button.addEventListener('click', async (e) => {
           const bookCard = e.target.closest('.book-card');
@@ -214,143 +393,255 @@
           currentBookId = bookId;
           document.getElementById('bookTitle').textContent = bookTitle;
           visibilitySelect.value = currentVisibility;
-          
-          // Show/hide access list section based on visibility
           toggleAccessListSection(currentVisibility);
-          
-          // If restricted, fetch users with access
           if (currentVisibility === 'restricted') {
             await fetchAccessList(bookId);
           }
-          
           modal.style.display = 'block';
         });
       });
-      
-      // Close modal when clicking X
+
       closeBtn.addEventListener('click', () => {
         modal.style.display = 'none';
       });
-      
-      // Close modal when clicking outside
+
       window.addEventListener('click', (e) => {
         if (e.target === modal) {
           modal.style.display = 'none';
         }
       });
-      
-      // Toggle access list section visibility
+
       visibilitySelect.addEventListener('change', () => {
         toggleAccessListSection(visibilitySelect.value);
       });
-      
-      // Save changes
-      saveBtn.addEventListener('click', async () => {
+
+      document.getElementById('saveVisibility').addEventListener('click', async () => {
         const newVisibility = visibilitySelect.value;
-        
         try {
           const response = await fetch(`/book/${currentBookId}/visibility`, {
             method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ visibility: newVisibility })
           });
-          
           const data = await response.json();
-          
           if (data.success) {
-            // Update the UI
             const bookCard = document.querySelector(`.book-card[data-id="${currentBookId}"]`);
             const visibilityBadge = bookCard.querySelector('.visibility-badge');
             const manageSharingBtn = bookCard.querySelector('.manage-sharing');
-            
             visibilityBadge.className = `visibility-badge visibility-${newVisibility}`;
             visibilityBadge.textContent = newVisibility.charAt(0).toUpperCase() + newVisibility.slice(1);
             manageSharingBtn.dataset.visibility = newVisibility;
-            
             modal.style.display = 'none';
-            alert('Visibility updated successfully');
+            alert('Visibility updated');
           } else {
             alert(data.message || 'Failed to update visibility');
           }
         } catch (err) {
-          console.error('Error:', err);
-          alert('An error occurred');
+          alert('Error updating visibility');
         }
       });
-      
-      // Helper function to toggle access list section
+
       function toggleAccessListSection(visibility) {
-        if (visibility === 'restricted') {
-          accessListSection.style.display = 'block';
-        } else {
-          accessListSection.style.display = 'none';
-        }
+        accessListSection.style.display = visibility === 'restricted' ? 'block' : 'none';
       }
-      
-      // Fetch users with access to the book
+
       async function fetchAccessList(bookId) {
         try {
           const response = await fetch(`/book/${bookId}/access-list`);
           const data = await response.json();
-          
           if (data.success) {
-            // Populate access list
-            accessList.innerHTML = '';
-            
-            if (data.users.length === 0) {
-              accessList.innerHTML = '<p>No users have been granted access yet.</p>';
-            } else {
-              data.users.forEach(user => {
-                const listItem = document.createElement('div');
-                listItem.className = 'access-list-item';
-                
-                listItem.innerHTML = `
-                  <span>${user.username} (${user.email})</span>
-                  <button class="btn btn-small btn-danger remove-access" data-user-id="${user._id}">Remove</button>
-                `;
-                
-                accessList.appendChild(listItem);
-              });
-              
-              // Add event listeners to remove buttons
-              document.querySelectorAll('.remove-access').forEach(button => {
-                button.addEventListener('click', async (e) => {
-                  const userId = e.target.dataset.userId;
-                  
-                  try {
-                    const response = await fetch(`/book/${currentBookId}/access/${userId}`, {
-                      method: 'DELETE'
-                    });
-                    
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                      e.target.closest('.access-list-item').remove();
-                      
-                      if (accessList.children.length === 0) {
-                        accessList.innerHTML = '<p>No users have been granted access yet.</p>';
-                      }
-                    } else {
-                      alert(data.message || 'Failed to remove access');
+            accessList.innerHTML = data.users.length === 0 ? '<p>No users have access.</p>' : '';
+            data.users.forEach(user => {
+              const listItem = document.createElement('div');
+              listItem.className = 'access-list-item';
+              listItem.innerHTML = `
+                <span>${user.username} (${user.email})</span>
+                <button class="btn btn-small btn-danger remove-access" data-user-id="${user._id}">Remove</button>
+              `;
+              accessList.appendChild(listItem);
+            });
+            document.querySelectorAll('.remove-access').forEach(button => {
+              button.addEventListener('click', async (e) => {
+                const userId = e.target.dataset.userId;
+                try {
+                  const response = await fetch(`/book/${currentBookId}/access/${userId}`, { method: 'DELETE' });
+                  const data = await response.json();
+                  if (data.success) {
+                    e.target.closest('.access-list-item').remove();
+                    if (accessList.children.length === 0) {
+                      accessList.innerHTML = '<p>No users have access.</p>';
                     }
-                  } catch (err) {
-                    console.error('Error:', err);
-                    alert('An error occurred');
+                  } else {
+                    alert(data.message || 'Failed to remove access');
                   }
-                });
+                } catch (err) {
+                  alert('Error removing access');
+                }
               });
-            }
+            });
           } else {
             accessList.innerHTML = '<p>Failed to load access list.</p>';
           }
         } catch (err) {
-          console.error('Error:', err);
           accessList.innerHTML = '<p>Failed to load access list.</p>';
         }
       }
+
+      const searchInput = document.getElementById('searchInput');
+      const searchButton = document.getElementById('searchButton');
+      const bookGrid = document.getElementById('bookGrid');
+      
+      searchButton.addEventListener('click', performSearch);
+      searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          performSearch();
+        }
+      });
+      
+      async function performSearch() {
+        const query = searchInput.value.trim();
+        if (!query) return;
+        try {
+          const response = await fetch(`/library/search?query=${encodeURIComponent(query)}`);
+          const data = await response.json();
+          if (data.books) {
+            bookGrid.innerHTML = '';
+            if (data.books.length === 0) {
+              bookGrid.innerHTML = `
+                <div class="empty-state">
+                  <p>No books found for "${query}". <a href="/upload">Upload a book</a>.</p>
+                </div>
+              `;
+            } else {
+              data.books.forEach(book => {
+                const bookCard = document.createElement('div');
+                bookCard.className = 'book-card';
+                bookCard.dataset.id = book._id;
+                bookCard.innerHTML = `
+                  <div class="book-cover">
+                    <img src="/thumbnail/${book._id}" alt="${book.title} cover" class="thumbnail" onerror="this.src='/images/default-thumbnail.png'">
+                  </div>
+                  <div class="book-info">
+                    <h3>${book.title}</h3>
+                    <p class="author">${book.author}</p>
+                    <span class="visibility-badge visibility-${book.visibility}">
+                      ${book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1)}
+                    </span>
+                    <div class="book-actions">
+                      <a href="/view/${book._id}" class="btn btn-primary">Read</a>
+                      <button class="btn btn-secondary manage-sharing" data-book-id="${book._id}" data-visibility="${book.visibility}">Share</button>
+                      <button class="btn btn-danger delete-book">Delete</button>
+                    </div>
+                  </div>
+                `;
+                bookGrid.appendChild(bookCard);
+              });
+              attachEventListeners();
+            }
+          }
+        } catch (err) {
+          alert('Search error');
+        }
+      }
+
+      function attachEventListeners() {
+        document.querySelectorAll('.delete-book').forEach(button => {
+          button.addEventListener('click', async (e) => {
+            const bookCard = e.target.closest('.book-card');
+            const bookId = bookCard.dataset.id;
+            if (confirm('Are you sure you want to delete this book?')) {
+              try {
+                const response = await fetch(`/book/${bookId}`, { method: 'DELETE' });
+                const data = await response.json();
+                if (data.success) {
+                  bookCard.remove();
+                  if (document.querySelectorAll('.book-card').length === 0) {
+                    document.querySelector('.book-grid').innerHTML = `
+                      <div class="empty-state">
+                        <p>Your library is empty. <a href="/upload">Upload your first book</a> to get started.</p>
+                      </div>
+                    `;
+                  }
+                } else {
+                  alert(data.message || 'Failed to delete book');
+                }
+              } catch (err) {
+                alert('Error deleting book');
+              }
+            }
+          });
+        });
+
+        document.querySelectorAll('.manage-sharing').forEach(button => {
+          button.addEventListener('click', async (e) => {
+            const bookCard = e.target.closest('.book-card');
+            const bookId = button.dataset.bookId;
+            const bookTitle = bookCard.querySelector('h3').textContent;
+            const currentVisibility = button.dataset.visibility;
+            currentBookId = bookId;
+            document.getElementById('bookTitle').textContent = bookTitle;
+            visibilitySelect.value = currentVisibility;
+            toggleAccessListSection(currentVisibility);
+            if (currentVisibility === 'restricted') {
+              await fetchAccessList(bookId);
+            }
+            modal.style.display = 'block';
+          });
+        });
+      }
     });
   </script>
+
+  <% if (user) { %>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+      const userId = '<%= user._id %>';
+      const profession = '<%= user.profession %>';
+
+      socket.emit('joinProfession', { userId, profession });
+
+      socket.on('chatHistory', (messages) => {
+        const chatMessages = document.getElementById('chatMessages');
+        chatMessages.innerHTML = '';
+        messages.forEach(msg => {
+          const messageElement = document.createElement('div');
+          messageElement.classList.add('message');
+          messageElement.innerHTML = `<strong>${msg.user.username}</strong>: ${msg.content} <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>`;
+          chatMessages.appendChild(messageElement);
+        });
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      });
+
+      socket.on('chatMessage', (msg) => {
+        const chatMessages = document.getElementById('chatMessages');
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('message');
+        messageElement.innerHTML = `<strong>${msg.user.username}</strong>: ${msg.content} <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>`;
+        chatMessages.appendChild(messageElement);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      });
+
+      function sendMessage() {
+        const input = document.getElementById('chatInput');
+        const content = input.value.trim();
+        if (content) {
+          socket.emit('chatMessage', { userId, profession, content });
+          input.value = '';
+        }
+      }
+
+      function toggleChat() {
+        const chatWindow = document.getElementById('chatWindow');
+        chatWindow.classList.toggle('open');
+      }
+
+      document.getElementById('chatInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          sendMessage();
+        }
+      });
+    </script>
+  <% } %>
 </body>
 </html>

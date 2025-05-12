@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account Settings - BookHive</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/chat.css?v=<%= new Date().getTime() %>">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://kit.fontawesome.com/your-fontawesome-kit.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="logo-section">
+        <img src="/images/logo.jpg" alt="BookHive Logo" class="logo">
+      </div>
+      <nav>
+        <a href="/news">NewsToday</a>
+        <a href="/library">My Library</a>
+        <!-- <a href="/pinned">Pinned Books</a> -->
+        <a href="/explore">Explore</a>
+        <!-- <a href="/my-requests">My Requests</a>
+        <a href="/access-requests">Access Requests</a> -->
+        <a href="/upload">Upload</a>
+        <a href="/account" class="active">Account</a>
+        <a href="/logout">Logout</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <h2>Account Settings</h2>
+
+    <div class="share-action-buttons">
+      <div class="share-container">
+        <div class="share-toggle" title="Share Library">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+          </svg>
+        </div>
+        <div class="share-options">
+          <button class="share-option" data-platform="whatsapp" title="Share on WhatsApp">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" class="share-icon">
+            WhatsApp
+          </button>
+          <button class="share-option" data-platform="instagram" title="Share on Instagram">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png" alt="Instagram" class="share-icon">
+            Instagram
+          </button>
+          <button class="share-option" data-platform="x" title="Share on X">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6f/Logo_of_Twitter.svg" alt="X" class="share-icon">
+            X
+          </button>
+          <button class="share-option" data-platform="copy" title="Copy Link">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+            </svg>
+            Copy Link
+          </button>
+        </div>
+        <div id="shareMessage" class="share-message"></div>
+      </div>
+      
+      <div class="notes-container">
+        <div class="notes-toggle" title="Notepad">✏️</div>
+        <div class="notes-area">
+          <div id="notesText" class="content-editable" contenteditable="true" placeholder="Write your notes here..."><%- note %></div>
+        </div>
+      </div>
+      
+      <div class="feedback-container">
+        <div class="feedback-toggle" title="Provide Feedback">
+          <svg fill="currentColor" viewBox="0 0 24 24">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+            <path d="M9 11h2v2H9zm0-4h2v2H9zm4 0h2v2h-2z"/>
+          </svg>
+        </div>
+        <div class="feedback-area">
+          <textarea id="feedbackText" placeholder="Write your feedback here..." required></textarea>
+          <button class="submit-feedback">Submit</button>
+          <div id="feedbackMessage" class="feedback-message"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="account-grid">
+      <!-- Profile Card -->
+      <div class="account-card">
+        <div class="card-header">
+          <i class="fas fa-user"></i>
+          <h3>Profile</h3>
+        </div>
+        <div class="profile-info">
+          <div class="info-row">
+            <span class="info-label">Username:</span>
+            <span class="info-value"><%= user.username %></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Email:</span>
+            <span class="info-value"><%= user.email %></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Joined:</span>
+            <span class="info-value"><%= new Date(user.createdAt).toLocaleDateString() %></span>
+          </div>
+        </div>
+        <button id="editProfileBtn" class="btn btn-primary btn-block">Edit Profile</button>
+        <form id="editProfileForm" class="edit-form hidden" action="/account/update-profile" method="POST" enctype="multipart/form-data">
+          <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" value="<%= user.username %>" required>
+          </div>
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" value="<%= user.email %>" required>
+          </div>
+          <div class="form-group">
+            <label for="currentPassword">Current Password</label>
+            <input type="password" id="currentPassword" name="currentPassword" required>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="button" id="debugEditProfile" class="btn btn-secondary">Debug Data</button>
+            <button type="button" id="cancelEditProfile" class="btn btn-secondary">Cancel</button>
+          </div>
+        </form>
+        <div id="editProfileMessage" class="form-message"></div>
+      </div>
+
+      <!-- Storage Card -->
+      <div class="account-card">
+        <div class="card-header">
+          <i class="fas fa-hdd"></i>
+          <h3>Storage</h3>
+        </div>
+        <div class="storage-info">
+          <canvas id="storageChart" height="100"></canvas>
+          <div class="storage-details">
+            <p>Used: <%= storageUsedMB %> MB</p>
+            <p>Total: <%= storageLimitMB %> MB</p>
+            <p>Available: <%= (storageLimitMB - storageUsedMB).toFixed(1) %> MB</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Password Card -->
+      <div class="account-card">
+        <div class="card-header">
+          <i class="fas fa-lock"></i>
+          <h3>Password</h3>
+        </div>
+        <button id="changePasswordBtn" class="btn btn-primary btn-block">Change Password</button>
+        <form id="changePasswordForm" class="edit-form hidden" action="/account/update-password" method="POST" enctype="multipart/form-data">
+          <div class="form-group">
+            <label for="currentPasswordForPwd">Current Password</label>
+            <input type="password" id="currentPasswordForPwd" name="currentPassword" required>
+          </div>
+          <div class="form-group">
+            <label for="newPassword">New Password</label>
+            <input type="password" id="newPassword" name="newPassword" required>
+          </div>
+          <div class="form-group">
+            <label for="confirmPassword">Confirm Password</label>
+            <input type="password" id="confirmPassword" name="confirmPassword" required>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Update</button>
+            <button type="button" id="debugChangePassword" class="btn btn-secondary">Debug Data</button>
+            <button type="button" id="cancelChangePassword" class="btn btn-secondary">Cancel</button>
+          </div>
+        </form>
+        <div id="changePasswordMessage" class="form-message"></div>
+      </div>
+
+      <!-- Requests Card -->
+      <div class="account-card">
+        <div class="card-header">
+          <i class="fas fa-envelope"></i>
+          <h3>Requests</h3>
+        </div>
+        <div class="request-links">
+          <a href="/my-requests" class="btn btn-secondary btn-block">My Requests</a>
+          <a href="/access-requests" class="btn btn-secondary btn-block">Pending Requests</a>
+        </div>
+      </div>
+
+      <!-- Danger Zone Card -->
+      <div class="account-card danger-zone">
+        <div class="card-header">
+          <i class="fas fa-exclamation-triangle"></i>
+          <h3>Danger Zone</h3>
+        </div>
+        <button id="deleteAccountBtn" class="btn btn-danger btn-block">Delete Account</button>
+        <div id="deleteAccountConfirm" class="edit-form hidden">
+          <p class="warning-text">Warning: This action is permanent and will delete all your data.</p>
+          <form id="deleteAccountForm" action="/account/delete" method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+              <label for="deletePassword">Password</label>
+              <input type="password" id="deletePassword" name="password" required>
+            </div>
+            <label class="confirm-text">
+              <input type="checkbox" id="confirmDelete" name="confirmDelete" required>
+              I understand this is permanent
+            </label>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-danger">Delete Account</button>
+              <button type="button" id="cancelDeleteAccount" class="btn btn-secondary">Cancel</button>
+            </div>
+          </form>
+          <div id="deleteAccountMessage" class="form-message"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <% if (user) { %>
+    <div class="chat-icon" onclick="toggleChat()">
+      <img src="/images/chat-icon.png" alt="Chat" />
+    </div>
+    <div class="chat-window" id="chatWindow">
+      <div class="chat-header">
+        <h3><%= user.profession.charAt(0).toUpperCase() + user.profession.slice(1) %> Group Chat</h3>
+        <button onclick="toggleChat()">Close</button>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input">
+        <input type="text" id="chatInput" placeholder="Type a message..." />
+        <button onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+  <% } %>
+
+  <footer>
+    <div class="container">
+      <p>© 2025 BookHive. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Debug CSS loading
+      const chatCssLink = document.querySelector('link[href*="/css/chat.css"]');
+      if (chatCssLink) {
+        console.log('chat.css is referenced in the document');
+        chatCssLink.addEventListener('load', () => {
+          console.log('chat.css loaded successfully');
+        });
+        chatCssLink.addEventListener('error', () => {
+          console.error('Error loading chat.css');
+        });
+      } else {
+        console.error('chat.css link not found in the document');
+      }
+
+      // Verify chat styles
+      const chatIcon = document.querySelector('.chat-icon');
+      if (chatIcon) {
+        const computedStyles = window.getComputedStyle(chatIcon);
+        console.log('Computed styles for .chat-icon:', {
+          position: computedStyles.position,
+          bottom: computedStyles.bottom,
+          right: computedStyles.right,
+          width: computedStyles.width,
+          height: computedStyles.height
+        });
+      }
+
+      const notesToggle = document.querySelector('.notes-toggle');
+      const notesArea = document.querySelector('.notes-area');
+      const notesText = document.getElementById('notesText');
+      let typingTimer;
+
+      if (notesToggle && notesArea) {
+        console.log('Notes toggle and area found');
+        notesToggle.addEventListener('click', () => {
+          console.log('Notes toggle clicked');
+          notesArea.classList.toggle('active');
+          const feedbackArea = document.querySelector('.feedback-area');
+          const shareOptions = document.querySelector('.share-options');
+          if (feedbackArea) feedbackArea.classList.remove('active'); // Close feedback area if open
+          if (shareOptions) shareOptions.classList.remove('active'); // Close share options if open
+        });
+      } else {
+        console.log('Notes toggle or area not found');
+      }
+
+      if (notesText) {
+        notesText.addEventListener('input', () => {
+          clearTimeout(typingTimer);
+          typingTimer = setTimeout(saveNotes, 1000);
+        });
+      }
+
+      function saveNotes() {
+        const content = notesText.innerHTML;
+        fetch('/notes/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (!data.success) {
+            console.error('Failed to save note:', data.message);
+          }
+        })
+        .catch(err => {
+          console.error('Error saving note:', err);
+        });
+      }
+
+      // Feedback functionality
+      const feedbackToggle = document.querySelector('.feedback-toggle');
+      const feedbackArea = document.querySelector('.feedback-area');
+      const feedbackText = document.getElementById('feedbackText');
+      const feedbackMessage = document.getElementById('feedbackMessage');
+      const submitFeedbackBtn = document.querySelector('.submit-feedback');
+
+      if (feedbackToggle && feedbackArea) {
+        console.log('Feedback toggle and area found');
+        feedbackToggle.addEventListener('click', () => {
+          console.log('Feedback toggle clicked');
+          feedbackArea.classList.toggle('active');
+          if (notesArea) notesArea.classList.remove('active'); // Close notes area if open
+          const shareOptions = document.querySelector('.share-options');
+          if (shareOptions) shareOptions.classList.remove('active'); // Close share options if open
+        });
+      } else {
+        console.log('Feedback toggle or area not found');
+      }
+
+      if (submitFeedbackBtn) {
+        submitFeedbackBtn.addEventListener('click', () => {
+          const content = feedbackText.value.trim();
+          if (!content) {
+            feedbackMessage.textContent = 'Please enter your feedback.';
+            feedbackMessage.className = 'feedback-message error';
+            return;
+          }
+
+          feedbackMessage.textContent = 'Submitting...';
+          feedbackMessage.className = 'feedback-message';
+
+          fetch('/feedback', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({ content })
+          })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+          })
+          .then(data => {
+            if (data.success) {
+              feedbackMessage.textContent = 'Feedback submitted successfully!';
+              feedbackMessage.className = 'feedback-message success';
+              feedbackText.value = ''; // Clear the textarea
+              feedbackArea.classList.remove('active'); // Close the feedback area
+            } else {
+              feedbackMessage.textContent = data.message || 'Failed to submit feedback.';
+              feedbackMessage.className = 'feedback-message error';
+            }
+          })
+          .catch(err => {
+            feedbackMessage.textContent = `Error submitting feedback: ${err.message}`;
+            feedbackMessage.className = 'feedback-message error';
+            console.error('Error submitting feedback:', err);
+          });
+        });
+      }
+
+      // Share functionality
+      const shareToggle = document.querySelector('.share-toggle');
+      const shareOptions = document.querySelector('.share-options');
+      const shareMessage = document.getElementById('shareMessage');
+      const currentUrl = window.location.href;
+
+      if (shareToggle && shareOptions) {
+        shareToggle.addEventListener('click', () => {
+          shareOptions.classList.toggle('active');
+          if (notesArea) notesArea.classList.remove('active'); // Close notes area if open
+          if (feedbackArea) feedbackArea.classList.remove('active'); // Close feedback area if open
+        });
+
+        // Close share options when clicking outside
+        document.addEventListener('click', (e) => {
+          if (!shareToggle.contains(e.target) && !shareOptions.contains(e.target)) {
+            shareOptions.classList.remove('active');
+          }
+        });
+
+        const shareButtons = shareOptions.querySelectorAll('.share-option');
+        shareButtons.forEach(button => {
+          button.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent closing the dropdown
+            const platform = button.dataset.platform;
+            let url = '';
+
+            switch (platform) {
+              case 'whatsapp':
+                url = `https://wa.me/?text=${encodeURIComponent('Check out my library on BookHive: ' + currentUrl)}`;
+                window.open(url, '_blank');
+                break;
+              case 'instagram':
+                url = `https://www.instagram.com/direct/new/?text=${encodeURIComponent('Check out my library on BookHive: ' + currentUrl)}`;
+                window.open(url, '_blank');
+                break;
+              case 'x':
+                url = `https://twitter.com/intent/tweet?text=Check out my library on BookHive: ${encodeURIComponent(currentUrl)}`;
+                window.open(url, '_blank');
+                break;
+              case 'copy':
+                navigator.clipboard.writeText(currentUrl)
+                  .then(() => {
+                    shareMessage.textContent = 'Link copied to clipboard!';
+                    shareMessage.className = 'share-message success';
+                    setTimeout(() => {
+                      shareMessage.textContent = '';
+                      shareMessage.className = 'share-message';
+                    }, 2000);
+                  })
+                  .catch(err => {
+                    shareMessage.textContent = 'Failed to copy link.';
+                    shareMessage.className = 'share-message error';
+                    console.error('Copy error:', err);
+                  });
+                break;
+            }
+            shareOptions.classList.remove('active'); // Close dropdown after action
+          });
+        });
+      }
+
+      // Toggle form visibility
+      const editProfileBtn = document.getElementById('editProfileBtn');
+      const editProfileForm = document.getElementById('editProfileForm');
+      const cancelEditProfile = document.getElementById('cancelEditProfile');
+      if (editProfileBtn && editProfileForm && cancelEditProfile) {
+        editProfileBtn.addEventListener('click', () => {
+          editProfileForm.classList.toggle('hidden');
+          editProfileBtn.classList.toggle('hidden');
+        });
+        cancelEditProfile.addEventListener('click', () => {
+          editProfileForm.classList.add('hidden');
+          editProfileBtn.classList.remove('hidden');
+          document.getElementById('editProfileMessage').textContent = '';
+        });
+      }
+
+      const changePasswordBtn = document.getElementById('changePasswordBtn');
+      const changePasswordForm = document.getElementById('changePasswordForm');
+      const cancelChangePassword = document.getElementById('cancelChangePassword');
+      if (changePasswordBtn && changePasswordForm && cancelChangePassword) {
+        changePasswordBtn.addEventListener('click', () => {
+          changePasswordForm.classList.toggle('hidden');
+          changePasswordBtn.classList.toggle('hidden');
+        });
+        cancelChangePassword.addEventListener('click', () => {
+          changePasswordForm.classList.add('hidden');
+          changePasswordBtn.classList.remove('hidden');
+          document.getElementById('changePasswordMessage').textContent = '';
+        });
+      }
+
+      const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+      const deleteAccountConfirm = document.getElementById('deleteAccountConfirm');
+      const cancelDeleteAccount = document.getElementById('cancelDeleteAccount');
+      if (deleteAccountBtn && deleteAccountConfirm && cancelDeleteAccount) {
+        deleteAccountBtn.addEventListener('click', () => {
+          deleteAccountConfirm.classList.toggle('hidden');
+          deleteAccountBtn.classList.toggle('hidden');
+        });
+        cancelDeleteAccount.addEventListener('click', () => {
+          deleteAccountConfirm.classList.add('hidden');
+          deleteAccountBtn.classList.remove('hidden');
+          document.getElementById('deleteAccountMessage').textContent = '';
+        });
+      }
+
+      // Debug form data
+      function debugFormData(formId, messageDivId) {
+        const form = document.getElementById(formId);
+        const messageDiv = document.getElementById(messageDivId);
+        const formData = new FormData(form);
+        const data = {};
+        for (const [key, value] of formData.entries()) {
+          data[key] = value;
+        }
+        console.log(`Debug ${formId} data:`, data);
+        messageDiv.className = 'form-message';
+        messageDiv.textContent = 'Check Console for form data';
+      }
+
+      const debugEditProfile = document.getElementById('debugEditProfile');
+      const debugChangePassword = document.getElementById('debugChangePassword');
+      if (debugEditProfile) {
+        debugEditProfile.addEventListener('click', () => {
+          debugFormData('editProfileForm', 'editProfileMessage');
+        });
+      }
+      if (debugChangePassword) {
+        debugChangePassword.addEventListener('click', () => {
+          debugFormData('changePasswordForm', 'changePasswordMessage');
+        });
+      }
+
+      // Handle form submissions
+      function handleFormSubmit(formId, messageDivId, successCallback) {
+      const form = document.getElementById(formId);
+      const messageDiv = document.getElementById(messageDivId);
+      if (!form || !messageDiv) return;
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        messageDiv.textContent = '';
+        messageDiv.className = 'form-message';
+
+        // Use FormData
+        const formData = new FormData(form);
+        const data = {};
+        for (const [key, value] of formData.entries()) {
+          data[key] = value;
+        }
+        console.log(`Form ${formId} data:`, data);
+
+        // Client-side validation
+        const errors = [];
+        if (formId === 'editProfileForm') {
+          if (!data.username || data.username.trim() === '') errors.push('Username is required');
+          if (!data.email || data.email.trim() === '') errors.push('Email is required');
+          if (!data.currentPassword || data.currentPassword.trim() === '') errors.push('Current password is required');
+        } else if (formId === 'changePasswordForm') {
+          if (!data.currentPassword || data.currentPassword.trim() === '') errors.push('Current password is required');
+          if (!data.newPassword || data.newPassword.trim() === '') errors.push('New password is required');
+          if (data.newPassword.length < 6) errors.push('New password must be at least 6 characters');
+          if (!data.confirmPassword || data.confirmPassword.trim() === '') errors.push('Confirm password is required');
+          if (data.newPassword !== data.confirmPassword) errors.push('Passwords do not match');
+        } else if (formId === 'deleteAccountForm') {
+          if (!data.password || data.password.trim() === '') errors.push('Password is required');
+          if (!data.confirmDelete) errors.push('Confirmation is required');
+        }
+
+        if (errors.length > 0) {
+          console.log(`Form ${formId} client validation errors:`, errors);
+          messageDiv.className = 'form-message error';
+          messageDiv.textContent = errors.join('\n');
+          return;
+        }
+
+        // AJAX submission
+        try {
+          const response = await fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+              'Accept': 'application/json'
+            }
+          });
+
+          // Log response details for debugging
+          console.log(`Form ${formId} response status:`, response.status);
+          console.log(`Form ${formId} response headers:`, Object.fromEntries(response.headers.entries()));
+          const contentType = response.headers.get('content-type');
+          console.log(`Form ${formId} response content-type:`, contentType);
+
+          // Check for redirect responses
+          if (response.redirected) {
+            console.warn(`Form ${formId} request was redirected to: ${response.url}`);
+            messageDiv.className = 'form-message error';
+            messageDiv.textContent = 'Session may have expired. Please log in again.';
+            setTimeout(() => {
+              window.location.href = '/login';
+            }, 2000);
+            return;
+          }
+
+          if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error(`Form ${formId} non-JSON response:`, text.substring(0, 500)); // Log first 500 chars
+            throw new Error('Server returned non-JSON response');
+          }
+
+          const result = await response.json();
+          console.log(`Form ${formId} response data:`, result);
+
+          if (response.ok && result.success) {
+            messageDiv.className = 'form-message success';
+            messageDiv.textContent = result.message || 'Operation successful';
+            if (successCallback) {
+              successCallback(result);
+            }
+          } else {
+            messageDiv.className = 'form-message error';
+            messageDiv.textContent = result.message || 'Operation failed';
+          }
+        } catch (err) {
+          console.error(`Form ${formId} AJAX error:`, err);
+          messageDiv.className = 'form-message error';
+          messageDiv.textContent = `Error: ${err.message}`;
+        }
+      });
+    }
+
+      // Initialize form handlers
+      handleFormSubmit('editProfileForm', 'editProfileMessage', () => {
+        location.reload();
+      });
+      handleFormSubmit('changePasswordForm', 'changePasswordMessage', () => {
+        document.getElementById('changePasswordForm').reset();
+        document.getElementById('changePasswordForm').classList.add('hidden');
+        document.getElementById('changePasswordBtn').classList.remove('hidden');
+      });
+      handleFormSubmit('deleteAccountForm', 'deleteAccountMessage', (data) => {
+        if (data.redirect) {
+          setTimeout(() => {
+            window.location.href = data.redirect;
+          }, 1000);
+        }
+      });
+
+      // Clear messages on input focus
+      document.querySelectorAll('input').forEach(input => {
+        input.addEventListener('focus', () => {
+          document.querySelectorAll('.form-message').forEach(div => {
+            div.textContent = '';
+            div.className = 'form-message';
+          });
+        });
+      });
+
+      // Storage chart
+      const used = Number('<%= storageUsedMB %>') || 0;
+      const total = Number('<%= storageLimitMB %>') || 500;
+      const available = total - used;
+      const ctx = document.getElementById('storageChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Used', 'Available'],
+          datasets: [{
+            data: [used, available > 0 ? available : 0],
+            backgroundColor: ['#007bff', '#6c757d'],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              display: true,
+              position: 'bottom',
+              labels: {
+                font: { size: 12 },
+                color: '#333'
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.parsed || 0;
+                  return `${label}: ${value.toFixed(1)} MB`;
+                }
+              }
+            }
+          },
+          cutout: '70%'
+        }
+      });
+    });
+  </script>
+
+  <% if (user) { %>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const socket = io();
+        const userId = '<%= user._id %>';
+        const profession = '<%= user.profession %>';
+
+        socket.emit('joinProfession', { userId, profession });
+
+        socket.on('chatHistory', (messages) => {
+          const chatMessages = document.getElementById('chatMessages');
+          if (chatMessages) {
+            chatMessages.innerHTML = '';
+            messages.forEach(msg => {
+              const messageElement = document.createElement('div');
+              messageElement.classList.add('message');
+              messageElement.innerHTML = `<strong>${msg.user.username}</strong>: ${msg.content} <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>`;
+              chatMessages.appendChild(messageElement);
+            });
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+          }
+        });
+
+        socket.on('chatMessage', (msg) => {
+          const chatMessages = document.getElementById('chatMessages');
+          if (chatMessages) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            messageElement.innerHTML = `<strong>${msg.user.username}</strong>: ${msg.content} <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>`;
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+          }
+        });
+
+        window.sendMessage = function() {
+          const input = document.getElementById('chatInput');
+          const content = input.value.trim();
+          if (content) {
+            socket.emit('chatMessage', { userId, profession, content });
+            input.value = '';
+          }
+        };
+
+        window.toggleChat = function() {
+          const chatWindow = document.getElementById('chatWindow');
+          if (chatWindow) {
+            chatWindow.classList.toggle('open');
+          }
+        };
+
+        const chatInput = document.getElementById('chatInput');
+        if (chatInput) {
+          chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+              sendMessage();
+            }
+          });
+        }
+      });
+    </script>
+  <% } %>
+
+  <style>
+    .form-message {
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      text-align: center;
+      white-space: pre-line;
+    }
+    .form-message.success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .form-message.error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .edit-form input[type="text"],
+    .edit-form input[type="email"],
+    .edit-form input[type="password"] {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .storage-info canvas {
+      max-width: 150px;
+      margin: 0 auto 0.5rem;
+    }
+    .form-actions {
+      display: flex;
+      justify-content: space-between;
+    }
+    .btn {
+      cursor: pointer;
+    }
+  </style>
+</body>
+</html>

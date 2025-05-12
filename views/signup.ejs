@@ -4,13 +4,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sign Up - MyLibrary</title>
+  <title>Sign Up - BookHive</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <header>
     <div class="container">
-      <h1><a href="/">MyLibrary</a></h1>
+      <div class="logo-section">
+        <img src="/images/logo.jpg" alt="BookHive Logo" class="logo">
+      </div>
     </div>
   </header>
   
@@ -39,6 +41,17 @@
         <input type="password" id="password" name="password" required>
       </div>
       
+      <div class="form-group">
+        <label for="profession">Profession</label>
+        <select id="profession" name="profession" required>
+          <option value="" disabled selected>Select your profession</option>
+          <option value="software">Software</option>
+          <option value="agriculture">Agriculture</option>
+          <option value="medicine">Medicine</option>
+          <option value="lawyer">Lawyer</option>
+        </select>
+      </div>
+      
       <button type="submit" class="btn btn-primary">Sign Up</button>
     </form>
     
@@ -49,7 +62,7 @@
   
   <footer>
     <div class="container">
-      <p>&copy; 2025 MyLibrary. All rights reserved.</p>
+      <p>&copy; 2025 BookHive. All rights reserved.</p>
     </div>
   </footer>
 </body>

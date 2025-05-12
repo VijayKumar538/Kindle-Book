@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= book.title %> - PDF Viewer - BookHive</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/js/all.min.js"></script>
+    <style>
+        /* Inter font (optional, if you prefer it over default sans) */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif; /* Using Inter font */
+            /* font-family: sans-serif; */ /* Default sans-serif */
+        }
+        .pdf-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100%;
+        }
+        /* Custom scrollbar for webkit browsers (Chrome, Safari, Edge) */
+        .canvas-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .canvas-container::-webkit-scrollbar-track {
+            background: #4b5563; /* gray-600 */
+        }
+        .canvas-container::-webkit-scrollbar-thumb {
+            background-color: #6b7280; /* gray-500 */
+            border-radius: 4px;
+            border: 2px solid #4b5563; /* gray-600 */
+        }
+        .canvas-container::-webkit-scrollbar-thumb:hover {
+            background-color: #9ca3af; /* gray-400 */
+        }
+        .canvas-container {
+            scrollbar-width: thin; /* For Firefox */
+            scrollbar-color: #6b7280 #4b5563; /* For Firefox */
+            flex-grow: 1;
+            overflow: auto;
+            background-color: #4b5563; /* Edge-like gray background */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align canvas to top */
+            padding: 2rem; /* More padding around canvas */
+        }
+        #pdf-canvas {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3); /* More prominent shadow */
+            background-color: white;
+            /* transition: opacity 0.3s ease; */ /* Removed for potentially faster feel */
+            /* Center align canvas if content is smaller than viewport */
+             margin: auto;
+        }
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap; /* Allow wrapping on smaller screens */
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            background-color: #1f2937; /* Dark Gray Toolbar */
+            color: #d1d5db; /* Light gray text */
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .toolbar-section {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem; /* Spacing between items in a section */
+            padding: 0.25rem 0; /* Padding for wrapped rows */
+        }
+        .toolbar-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem;
+            min-width: 2.5rem; /* Ensure consistent button width */
+            height: 2.5rem;
+            border: none;
+            border-radius: 0.25rem;
+            background-color: transparent;
+            color: #d1d5db; /* Light gray icon/text */
+            transition: background-color 0.15s ease-in-out;
+        }
+        .toolbar-button:hover {
+            background-color: #374151; /* Slightly lighter gray on hover */
+            color: #f9fafb; /* White on hover */
+        }
+         .toolbar-button:disabled {
+             opacity: 0.5;
+             cursor: not-allowed;
+             background-color: transparent; /* Ensure disabled doesn't have hover effect */
+         }
+        .page-controls input {
+            width: 3.5rem;
+            text-align: center;
+            border: 1px solid #4b5563; /* gray-600 */
+            background-color: #374151; /* gray-700 */
+            color: #f9fafb; /* gray-50 */
+            border-radius: 0.25rem;
+            padding: 0.35rem 0.25rem;
+            font-size: 0.875rem;
+        }
+        .page-controls input:focus {
+             outline: none;
+             border-color: #60a5fa; /* blue-400 */
+             box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+         }
+        .page-info {
+             padding: 0 0.5rem;
+             font-size: 0.875rem;
+             color: #9ca3af; /* gray-400 */
+        }
+        /* Notes sidebar styles */
+        .notes-container {
+            position: fixed;
+            top: 0;
+            right: 0; /* Start hidden off-screen */
+            width: 24rem; /* Slightly wider */
+            max-width: 90vw;
+            height: 100vh;
+            background-color: #ffffff;
+            box-shadow: -4px 0 10px rgba(0, 0, 0, 0.1);
+            transform: translateX(100%); /* Hidden state */
+            transition: transform 0.3s ease-in-out;
+            z-index: 100; /* Ensure it's above the canvas container */
+            display: flex;
+            flex-direction: column;
+         }
+        .notes-container.show {
+            transform: translateX(0); /* Visible state */
+        }
+        .notes-header {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+         .notes-header h3 {
+             font-weight: 600;
+             color: #1f2937;
+         }
+        .notes-area {
+            flex-grow: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            outline: none;
+        }
+        #notesText {
+            min-height: 100%;
+            font-size: 0.875rem;
+            color: #374151;
+            outline: none;
+        }
+        #notesText:empty:before {
+            content: attr(placeholder);
+            color: #9ca3af; /* Lighter placeholder */
+            pointer-events: none; /* Allow clicking through placeholder */
+        }
+        /* Loading Spinner */
+        .loading-spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none; /* Prevent interaction when hidden */
+        }
+        .loading-spinner.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .spinner {
+            border: 4px solid rgba(200, 200, 200, 0.2);
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            border-left-color: #60a5fa; /* Blue */
+            animation: spin 1s linear infinite;
+        }
+        .loading-text {
+            color: #d1d5db; /* Light text for dark background */
+            font-size: 0.875rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            .toolbar {
+                 justify-content: space-around; /* Better spacing when wrapped */
+            }
+            .book-title {
+                display: none; /* Hide title on small screens to save space */
+            }
+            .notes-container {
+                width: 90vw; /* Make notes wider on mobile */
+            }
+            .canvas-container {
+                 padding: 1rem; /* Less padding on mobile */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="pdf-container bg-gray-600"> <div id="notesContainer" class="notes-container">
+            <div class="notes-header">
+                 <h3>My Notes</h3>
+                 <button id="closeNotes" class="toolbar-button" style="color: #4b5563;" title="Close Notes"> <i class="fas fa-times"></i>
+                 </button>
+            </div>
+            <div class="notes-area">
+                <div id="notesText" contenteditable="true" placeholder="Write your notes here..." spellcheck="false"><%- note %></div>
+            </div>
+        </div>
+
+        <nav class="main-nav bg-white shadow-sm z-20 relative"> <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex">
+                        <div class="flex-shrink-0 flex items-center">
+                            <img src="/images/logo.jpg" alt="BookHive Logo" class="h-16 w-auto">
+                            <span class="book-title text-gray-800 font-semibold truncate ml-4 hidden md:inline"><%= book.title %></span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <a href="/library" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">My Library</a>
+                        <!-- <a href="/pinned" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Pinned Books</a> -->
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="toolbar z-10 relative"> <div class="toolbar-section">
+                <a href="javascript:history.back()" class="toolbar-button" title="Back">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <span class="book-title text-gray-100 font-semibold truncate hidden sm:inline md:hidden"><%= book.title %></span> </div>
+
+            <div class="toolbar-section page-controls">
+                <button id="prev" class="toolbar-button" title="Previous Page">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="flex items-center">
+                    <input type="number" id="pageNumber" value="1" min="1">
+                    <span class="page-info">/ <span id="pageCount">0</span></span>
+                </div>
+                <button id="next" class="toolbar-button" title="Next Page">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+
+             <div class="toolbar-section zoom-controls">
+                 <button id="zoomOut" class="toolbar-button" title="Zoom Out">
+                     <i class="fas fa-search-minus"></i>
+                 </button>
+                 <button id="zoomIn" class="toolbar-button" title="Zoom In">
+                     <i class="fas fa-search-plus"></i>
+                 </button>
+                 </div>
+
+            <div class="toolbar-section utility-controls">
+                 <button id="toggleNotes" class="toolbar-button" title="Toggle Notes">
+                      <i class="fas fa-edit"></i> </button>
+                <button id="toggleFullscreen" class="toolbar-button" title="Fullscreen">
+                    <i class="fas fa-expand"></i>
+                </button>
+                </div>
+        </div>
+
+        <div class="canvas-container" id="canvasContainer">
+            <canvas id="pdf-canvas"></canvas>
+            <div class="loading-spinner" id="loading">
+                <div class="spinner"></div>
+                <p class="loading-text">Loading PDF...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // --- Notes Sidebar Elements and Logic ---
+            const notesContainer = document.getElementById('notesContainer');
+            const toggleNotesButton = document.getElementById('toggleNotes');
+            const closeNotesButton = document.getElementById('closeNotes');
+            const notesText = document.getElementById('notesText');
+            let typingTimer;
+
+            toggleNotesButton.addEventListener('click', () => {
+                notesContainer.classList.toggle('show');
+            });
+            closeNotesButton.addEventListener('click', () => {
+                notesContainer.classList.remove('show');
+            });
+
+            notesText.addEventListener('input', () => {
+                clearTimeout(typingTimer);
+                typingTimer = setTimeout(saveNotes, 1000); // Auto-save after 1s inactivity
+            });
+
+            async function saveNotes() {
+                const content = notesText.innerHTML; // Save HTML content to preserve formatting
+                try {
+                    const response = await fetch('/notes/save', { // Make sure this endpoint expects HTML
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ bookId: '<%= book._id %>', content }) // Assuming you need bookId
+                    });
+                    if (!response.ok) {
+                       const data = await response.json().catch(() => ({ message: 'Unknown error' }));
+                       console.error('Failed to save note:', data.message || response.statusText);
+                       // Optionally display user feedback
+                    } else {
+                         console.log('Notes saved successfully');
+                         // Optional success feedback
+                    }
+                } catch (err) {
+                    console.error('Error saving note:', err);
+                     // Optionally display user feedback
+                }
+            }
+
+            // --- PDF.js Setup ---
+            const pdfjsLib = window['pdfjs-dist/build/pdf'];
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.14.305/pdf.worker.min.js';
+
+            let pdfDoc = null;
+            let pageNum = 1;
+            let pageRendering = false;
+            let pageNumPending = null;
+            let currentScale = 1.0; // Initial scale factor
+            const initialAutoScale = true; // Flag to indicate if the first render should auto-scale
+            const canvas = document.getElementById('pdf-canvas');
+            const ctx = canvas.getContext('2d');
+            const container = document.getElementById('canvasContainer');
+            const loading = document.getElementById('loading');
+            const pageNumberInput = document.getElementById('pageNumber');
+            const pageCountDisplay = document.getElementById('pageCount');
+            const prevButton = document.getElementById('prev');
+            const nextButton = document.getElementById('next');
+            const zoomInButton = document.getElementById('zoomIn');
+            const zoomOutButton = document.getElementById('zoomOut');
+
+
+            // --- PDF Loading ---
+             const pdfUrl = '/file/<%= book._id %>'; // Ensure this route serves the PDF file
+            console.log('Loading PDF from:', pdfUrl); // Debug log
+            loading.classList.add('show'); // Show spinner immediately
+
+            const loadingTask = pdfjsLib.getDocument(pdfUrl);
+            loadingTask.promise.then(function(pdf) {
+                console.log('PDF loaded successfully'); // Debug log
+                pdfDoc = pdf;
+                pageCountDisplay.textContent = pdf.numPages;
+                pageNumberInput.max = pdf.numPages; // Set max for input
+                updatePageNavControls();
+                renderPage(pageNum, initialAutoScale ? null : currentScale); // Initial render
+             }).catch(function(error) {
+                console.error('Error loading PDF:', error);
+                loading.innerHTML = '<p class="text-red-400 font-semibold">Error loading PDF. Please check the file or try again later.</p>';
+                 loading.classList.add('show'); // Keep showing the error
+            });
+
+            // --- PDF Page Rendering ---
+            function renderPage(num, scaleToUse = currentScale) {
+                if (!pdfDoc) return; // Prevent rendering if pdfDoc is not loaded
+                pageRendering = true;
+                loading.classList.add('show'); // Show spinner during render
+                canvas.style.opacity = '0.5'; // Dim canvas while rendering
+
+                pdfDoc.getPage(num).then(function(page) {
+                    const Dpr = window.devicePixelRatio || 1;
+                    const containerPadding = 32; // Approximation of padding (2rem * 16px/rem) * 2 sides
+                    const availableWidth = container.clientWidth - containerPadding;
+                    const availableHeight = container.clientHeight - containerPadding;
+
+                    let viewport = page.getViewport({ scale: 1 }); // Original viewport
+
+                     // Determine the scale
+                     let scale;
+                     if (scaleToUse === null) { // Auto scale (fit page)
+                         const scaleX = availableWidth / viewport.width;
+                         const scaleY = availableHeight / viewport.height;
+                         scale = Math.min(scaleX, scaleY, 2.0); // Fit page, max zoom 2x initially
+                         currentScale = scale; // Update currentScale to the auto-fitted scale
+                     } else {
+                         scale = scaleToUse; // Use provided scale (from zoom buttons or resize)
+                     }
+
+                    viewport = page.getViewport({ scale: scale * Dpr });
+
+                    canvas.height = Math.floor(viewport.height);
+                    canvas.width = Math.floor(viewport.width);
+                    canvas.style.height = Math.floor(viewport.height / Dpr) + 'px';
+                    canvas.style.width = Math.floor(viewport.width / Dpr) + 'px';
+
+                    const renderContext = {
+                        canvasContext: ctx,
+                        viewport: viewport,
+                         enableWebGL: true // Optional: Can sometimes improve performance
+                    };
+
+                    const renderTask = page.render(renderContext);
+                    renderTask.promise.then(function() {
+                        console.log(`Page ${num} rendered at scale ${scale.toFixed(2)}`); // Debug log
+                        pageRendering = false;
+                        loading.classList.remove('show'); // Hide spinner
+                         canvas.style.opacity = '1'; // Restore canvas opacity
+                        pageNumberInput.value = num;
+                        updatePageNavControls();
+
+                        if (pageNumPending !== null) {
+                            renderPage(pageNumPending);
+                            pageNumPending = null;
+                        }
+                    }).catch(renderError => {
+                         console.error(`Error rendering page ${num}:`, renderError);
+                         pageRendering = false;
+                         loading.classList.remove('show');
+                          canvas.style.opacity = '1';
+                         // Optionally show error message to user
+                    });
+                });
+            }
+
+            // Queue rendering to prevent multiple renders at once
+            function queueRenderPage(num, scale = currentScale) {
+                if (pageRendering) {
+                    pageNumPending = num;
+                    // Should we also store the pending scale? For now, it uses the latest currentScale when it runs.
+                } else {
+                    renderPage(num, scale);
+                }
+            }
+
+            // Update button disabled states
+             function updatePageNavControls() {
+                 if (!pdfDoc) return;
+                 prevButton.disabled = (pageNum <= 1);
+                 nextButton.disabled = (pageNum >= pdfDoc.numPages);
+                 zoomOutButton.disabled = (currentScale <= 0.25); // Set a min zoom limit
+                 zoomInButton.disabled = (currentScale >= 5.0);   // Set a max zoom limit
+             }
+
+
+            // --- Page Navigation ---
+            function onPrevPage() {
+                if (pageNum <= 1) return;
+                pageNum--;
+                queueRenderPage(pageNum);
+            }
+
+            function onNextPage() {
+                if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
+                pageNum++;
+                queueRenderPage(pageNum);
+            }
+
+             prevButton.addEventListener('click', onPrevPage);
+            nextButton.addEventListener('click', onNextPage);
+
+            pageNumberInput.addEventListener('change', function() {
+                if (!pdfDoc) return;
+                let inputVal = parseInt(this.value, 10);
+                if (!isNaN(inputVal) && inputVal >= 1 && inputVal <= pdfDoc.numPages) {
+                    if (inputVal !== pageNum) {
+                        pageNum = inputVal;
+                        queueRenderPage(pageNum);
+                    }
+                } else {
+                    // Reset to current page number if input is invalid
+                    this.value = pageNum;
+                }
+            });
+
+             // --- Zoom Controls ---
+             function onZoomIn() {
+                 if (currentScale >= 5.0) return; // Max zoom limit
+                 currentScale = parseFloat((currentScale + 0.1).toFixed(2)); // Increment and round
+                 queueRenderPage(pageNum);
+             }
+
+             function onZoomOut() {
+                 if (currentScale <= 0.25) return; // Min zoom limit
+                 currentScale = parseFloat((currentScale - 0.1).toFixed(2)); // Decrement and round
+                 queueRenderPage(pageNum);
+             }
+
+             zoomInButton.addEventListener('click', onZoomIn);
+             zoomOutButton.addEventListener('click', onZoomOut);
+
+            // --- Fullscreen ---
+            const fullscreenButton = document.getElementById('toggleFullscreen');
+             const pdfContainerElement = document.querySelector('.pdf-container'); // Target the main container for fullscreen
+
+            fullscreenButton.addEventListener('click', function() {
+                 toggleFullscreen(pdfContainerElement); // Pass the element to make fullscreen
+            });
+
+             function toggleFullscreen(element) {
+                if (!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+                    // Enter fullscreen
+                    if (element.requestFullscreen) {
+                        element.requestFullscreen();
+                    } else if (element.msRequestFullscreen) {
+                        element.msRequestFullscreen();
+                    } else if (element.mozRequestFullScreen) {
+                        element.mozRequestFullScreen();
+                    } else if (element.webkitRequestFullscreen) {
+                        element.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
+                    }
+                } else {
+                    // Exit fullscreen
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.msExitFullscreen) {
+                        document.msExitFullscreen();
+                    } else if (document.mozCancelFullScreen) {
+                        document.mozCancelFullScreen();
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                    }
+                }
+            }
+
+            function updateFullscreenButtonIcon() {
+                const isFullscreen = !!(document.fullscreenElement || document.mozFullScreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+                fullscreenButton.innerHTML = isFullscreen ? '<i class="fas fa-compress"></i>' : '<i class="fas fa-expand"></i>';
+                 fullscreenButton.title = isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen';
+                // Re-render after a short delay to allow layout changes
+                 setTimeout(() => queueRenderPage(pageNum), 100);
+             }
+
+            // Listen for fullscreen changes
+            document.addEventListener('fullscreenchange', updateFullscreenButtonIcon);
+            document.addEventListener('webkitfullscreenchange', updateFullscreenButtonIcon);
+            document.addEventListener('mozfullscreenchange', updateFullscreenButtonIcon);
+            document.addEventListener('MSFullscreenChange', updateFullscreenButtonIcon);
+
+            // --- Keyboard Shortcuts ---
+            document.addEventListener('keydown', function(e) {
+                 // Don't interfere if user is typing in the notes or page number input
+                 if (e.target === notesText || e.target === pageNumberInput) {
+                     return;
+                 }
+
+                let handled = false;
+                if (e.key === 'ArrowRight' || e.key === ' ') { // Space or Right Arrow for Next Page
+                    onNextPage();
+                    handled = true;
+                } else if (e.key === 'ArrowLeft') { // Left Arrow for Previous Page
+                    onPrevPage();
+                    handled = true;
+                } else if (e.key === '+' || e.key === '=') { // '+' or '=' for Zoom In
+                     onZoomIn();
+                     handled = true;
+                } else if (e.key === '-') { // '-' for Zoom Out
+                     onZoomOut();
+                     handled = true;
+                 } else if (e.key === 'f') { // 'f' for Fullscreen
+                     toggleFullscreen(pdfContainerElement);
+                     handled = true;
+                 }
+
+                 if (handled) {
+                     e.preventDefault(); // Prevent default browser action (like scrolling with space)
+                 }
+            });
+
+            // --- Resize Handler ---
+             let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    if (pdfDoc) {
+                        console.log('Window resized, re-rendering page.'); // Debug log
+                         // Re-render with the current scale factor, letting the render function adjust based on new container size
+                        queueRenderPage(pageNum, currentScale);
+                     }
+                }, 250); // Debounce resize events
+            });
+        });
+    </script>
+</body>
+</html>
