@@ -14,12 +14,12 @@
         <img src="/images/logo.jpg" alt="BookHive Logo" class="logo">
       </div>
       <nav>
-        <a href="/library">My Library</a>
+        <!-- <a href="/library">My Library</a> -->
         <!-- <a href="/pinned">Pinned Books</a> -->
-        <a href="/explore">Explore</a>
+        <!-- <a href="/explore">Explore</a> -->
         <a href="/my-requests" class="active">My Requests</a>
-        <a href="/access-requests">Access Requests</a>
-        <a href="/upload">Upload Book</a>
+        <!-- <a href="/access-requests">Access Requests</a> -->
+        <!-- <a href="/upload">Upload Book</a> -->
         <a href="/account">Account</a>
         <a href="/logout">Logout</a>
       </nav>
@@ -29,12 +29,12 @@
   <main class="container">
     <h2>My Access Requests</h2>
 
-    <div class="notes-container">
+    <!-- <div class="notes-container">
       <div class="notes-toggle">✏️</div>
       <div class="notes-area">
         <div id="notesText" class="content-editable" contenteditable="true" placeholder="Write your notes here..."><%- note %></div>
       </div>
-    </div>
+    </div> -->
 
     <% if (requests.length === 0) { %>
       <div class="empty-state">
@@ -92,37 +92,6 @@
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const notesToggle = document.querySelector('.notes-toggle');
-      const notesArea = document.querySelector('.notes-area');
-      const notesText = document.getElementById('notesText');
-      let typingTimer;
-
-      notesToggle.addEventListener('click', () => {
-        const isVisible = notesArea.style.display === 'block';
-        notesArea.style.display = isVisible ? 'none' : 'block';
-      });
-
-      notesText.addEventListener('input', () => {
-        clearTimeout(typingTimer);
-        typingTimer = setTimeout(saveNotes, 1000);
-      });
-
-      async function saveNotes() {
-        const content = notesText.innerHTML; // Use innerHTML to capture bold tags
-        try {
-          const response = await fetch('/notes/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content })
-          });
-          const data = await response.json();
-          if (!data.success) {
-            console.error('Failed to save note:', data.message);
-          }
-        } catch (err) {
-          console.error('Error saving note:', err);
-        }
-      }
       // Format dates for better display
       const formatDates = () => {
         const dateElements = document.querySelectorAll('td:nth-child(4), td:nth-child(5)');

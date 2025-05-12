@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base href="/bookhive/">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NewsToday - BookHive</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/chat.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="logo-section">
+        <img src="/images/logo.jpg" alt="BookHive Logo" class="logo">
+      </div>
+      <nav>
+        <a href="/news" class="active">NewsToday</a>
+        <a href="/library">My Library</a>
+        <a href="/explore">Explore</a>
+        <!-- <a href="/access-requests">Access Requests</a> -->
+        <a href="/upload">Upload</a>
+        <a href="/account">Account</a>
+        <a href="/logout">Logout</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <h2>NewsToday</h2>
+    
+    <div class="share-action-buttons">
+      <div class="share-container">
+        <div class="share-toggle" title="Share News">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+          </svg>
+        </div>
+        <div class="share-options">
+          <button class="share-option" data-platform="whatsapp" title="Share on WhatsApp">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" class="share-icon">
+            WhatsApp
+          </button>
+          <button class="share-option" data-platform="instagram" title="Share on Instagram">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png" alt="Instagram" class="share-icon">
+            Instagram
+          </button>
+          <button class="share-option" data-platform="x" title="Share on X">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/6/6f/Logo_of_Twitter.svg" alt="X" class="share-icon">
+            X
+          </button>
+          <button class="share-option" data-platform="copy" title="Copy Link">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+            </svg>
+            Copy Link
+          </button>
+        </div>
+        <div id="shareMessage" class="share-message"></div>
+      </div>
+      
+      <div class="notes-container">
+        <div class="notes-toggle" title="Notepad">✏️</div>
+        <div class="notes-area">
+          <div id="notesText" class="content-editable" contenteditable="true" placeholder="Write your notes here..."><%- note %></div>
+        </div>
+      </div>
+      
+      <div class="feedback-container">
+        <div class="feedback-toggle" title="Provide Feedback">
+          <svg fill="currentColor" viewBox="0 0 24 24">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
+            <path d="M9 11h2v2H9zm0-4h2v2H9zm4 0h2v2h-2z"/>
+          </svg>
+        </div>
+        <div class="feedback-area">
+          <textarea id="feedbackText" placeholder="Write your feedback here..." required></textarea>
+          <button class="submit-feedback">Submit</button>
+          <div id="feedbackMessage" class="feedback-message"></div>
+        </div>
+      </div>
+    </div>
+    
+    <section class="news-feed">
+      <!-- New Books Uploaded Today -->
+      <h3>New Books Uploaded Today</h3>
+      <% if (newBooks.length === 0) { %>
+        <div class="news-item">
+          <p>No new books uploaded today.</p>
+        </div>
+      <% } else { %>
+        <% newBooks.forEach(book => { %>
+          <div class="news-item book-news">
+            <div class="news-content">
+              <h4>New Book: <%= book.title %> - Author: <%= book.author %></h4>
+              <p class="visibility">
+                <span class="visibility-badge visibility-<%= book.visibility %>">
+                  <%= book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1) %>
+                </span>
+              </p>
+              <% if (book.hasAccess){ %>
+                <a href="/view/<%= book._id %>" class="btn btn-primary">Read</a>
+              <% } else if (book.visibility === 'public') {%>
+                <a href= "/view/<%= book._id %>" class="btn btn-primary">Read</a>
+              <% } else if (book.visibility === 'restricted') { %>
+                <% if (book.hasPendingRequest) { %>
+                  <button class="btn btn-secondary disabled" disabled>Request Sent</button>
+                <% } else { %>
+                  <button class="btn btn-secondary request-access-btn" data-book-id="<%= book._id %>" data-book-title="<%= book.title %>">Request Access</button>
+                <% } %>
+                <div class="request-message" id="requestMessage-<%= book._id %>"></div>
+              <% } %>
+            </div>
+          </div>
+        <% }) %>
+      <% } %>
+
+      <!-- News Updates -->
+      <h3>Latest Updates</h3>
+      <% if (news.length === 0) { %>
+        <div class="news-item">
+          <p>No news updates available.</p>
+        </div>
+      <% } else { %>
+        <% news.forEach(update => { %>
+          <div class="news-item">
+            <div class="news-content">
+              <h4><%= update.title %></h4>
+              <p><%= update.content %></p>
+              <% if (update.image) { %>
+                <img src="/news-image/<%= update._id %>" alt="<%= update.title %> image" class="news-image">
+              <% } %>
+              <p class="news-timestamp">Posted: <%= new Date(update.createdAt).toLocaleString() %></p>
+            </div>
+          </div>
+        <% }) %>
+      <% } %>
+    </section>
+  </main>
+
+  <% if (user) { %>
+    <div class="chat-icon" onclick="toggleChat()">
+      <img src="/images/chat-icon.png" alt="Chat" />
+    </div>
+    <div class="chat-window" id="chatWindow">
+      <div class="chat-header">
+        <h3><%= user.profession.charAt(0).toUpperCase() + user.profession.slice(1) %> Group Chat</h3>
+        <button onclick="toggleChat()">Close</button>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input">
+        <input type="text" id="chatInput" placeholder="Type a message..." />
+        <button onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+  <% } %>
+
+  <footer>
+    <div class="container">
+      <p>© 2025 BookHive. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Notes functionality
+      const notesToggle = document.querySelector('.notes-toggle');
+      const notesArea = document.querySelector('.notes-area');
+      const notesText = document.getElementById('notesText');
+      let typingTimer;
+
+      if (notesToggle && notesArea) {
+        console.log('Notes toggle and area found');
+        notesToggle.addEventListener('click', () => {
+          console.log('Notes toggle clicked');
+          notesArea.classList.toggle('active');
+          const feedbackArea = document.querySelector('.feedback-area');
+          const shareOptions = document.querySelector('.share-options');
+          if (feedbackArea) feedbackArea.classList.remove('active');
+          if (shareOptions) shareOptions.classList.remove('active');
+        });
+      } else {
+        console.log('Notes toggle or area not found');
+      }
+
+      if (notesText) {
+        notesText.addEventListener('input', () => {
+          clearTimeout(typingTimer);
+          typingTimer = setTimeout(saveNotes, 1000);
+        });
+      }
+
+      function saveNotes() {
+        const content = notesText.innerHTML;
+        fetch('/notes/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (!data.success) {
+            console.error('Failed to save note:', data.message);
+          }
+        })
+        .catch(err => {
+          console.error('Error saving note:', err);
+        });
+      }
+
+      // Feedback functionality
+      const feedbackToggle = document.querySelector('.feedback-toggle');
+      const feedbackArea = document.querySelector('.feedback-area');
+      const feedbackText = document.getElementById('feedbackText');
+      const feedbackMessage = document.getElementById('feedbackMessage');
+      const submitFeedbackBtn = document.querySelector('.submit-feedback');
+
+      if (feedbackToggle && feedbackArea) {
+        console.log('Feedback toggle and area found');
+        feedbackToggle.addEventListener('click', () => {
+          console.log('Feedback toggle clicked');
+          feedbackArea.classList.toggle('active');
+          if (notesArea) notesArea.classList.remove('active');
+          const shareOptions = document.querySelector('.share-options');
+          if (shareOptions) shareOptions.classList.remove('active');
+        });
+      } else {
+        console.log('Feedback toggle or area not found');
+      }
+
+      if (submitFeedbackBtn) {
+        submitFeedbackBtn.addEventListener('click', () => {
+          const content = feedbackText.value.trim();
+          if (!content) {
+            feedbackMessage.textContent = 'Please enter your feedback.';
+            feedbackMessage.className = 'feedback-message error';
+            return;
+          }
+
+          feedbackMessage.textContent = 'Submitting...';
+          feedbackMessage.className = 'feedback-message';
+
+          fetch('/feedback', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({ content })
+          })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+          })
+          .then(data => {
+            if (data.success) {
+              feedbackMessage.textContent = 'Feedback submitted successfully!';
+              feedbackMessage.className = 'feedback-message success';
+              feedbackText.value = '';
+              feedbackArea.classList.remove('active');
+            } else {
+              feedbackMessage.textContent = data.message || 'Failed to submit feedback.';
+              feedbackMessage.className = 'feedback-message error';
+            }
+          })
+          .catch(err => {
+            feedbackMessage.textContent = `Error submitting feedback: ${err.message}`;
+            feedbackMessage.className = 'feedback-message error';
+            console.error('Error submitting feedback:', err);
+          });
+        });
+      }
+
+      // Share functionality
+      const shareToggle = document.querySelector('.share-toggle');
+      const shareOptions = document.querySelector('.share-options');
+      const shareMessage = document.getElementById('shareMessage');
+      const currentUrl = window.location.href;
+
+      if (shareToggle && shareOptions) {
+        shareToggle.addEventListener('click', () => {
+          shareOptions.classList.toggle('active');
+          if (notesArea) notesArea.classList.remove('active');
+          if (feedbackArea) feedbackArea.classList.remove('active');
+        });
+
+        document.addEventListener('click', (e) => {
+          if (!shareToggle.contains(e.target) && !shareOptions.contains(e.target)) {
+            shareOptions.classList.remove('active');
+          }
+        });
+
+        const shareButtons = shareOptions.querySelectorAll('.share-option');
+        shareButtons.forEach(button => {
+          button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const platform = button.dataset.platform;
+            let url = '';
+
+            switch (platform) {
+              case 'whatsapp':
+                url = `https://wa.me/?text=${encodeURIComponent('Check out the latest news on BookHive: ' + currentUrl)}`;
+                window.open(url, '_blank');
+                break;
+              case 'instagram':
+                url = `https://www.instagram.com/direct/new/?text=${encodeURIComponent('Check out the latest news on BookHive: ' + currentUrl)}`;
+                window.open(url, '_blank');
+                break;
+              case 'x':
+                url = `https://twitter.com/intent/tweet?text=Check out the latest news on BookHive: ${encodeURIComponent(currentUrl)}`;
+                window.open(url, '_blank');
+                break;
+              case 'copy':
+                navigator.clipboard.writeText(currentUrl)
+                  .then(() => {
+                    shareMessage.textContent = 'Link copied to clipboard!';
+                    shareMessage.className = 'share-message success';
+                    setTimeout(() => {
+                      shareMessage.textContent = '';
+                      shareMessage.className = 'share-message';
+                    }, 2000);
+                  })
+                  .catch(err => {
+                    shareMessage.textContent = 'Failed to copy link.';
+                    shareMessage.className = 'share-message error';
+                    console.error('Copy error:', err);
+                  });
+                break;
+            }
+            shareOptions.classList.remove('active');
+          });
+        });
+      }
+
+      // Check session status
+      async function checkSession() {
+        try {
+          const response = await fetch('/account/storage-info', {
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          });
+          if (!response.ok || response.status === 401) {
+            console.warn('Session check failed, redirecting to login');
+            window.location.href = '/login';
+            return false;
+          }
+          return true;
+        } catch (err) {
+          console.error('Session check error:', err);
+          return false;
+        }
+      }
+
+      // Request Access functionality
+      const requestAccessButtons = document.querySelectorAll('.request-access-btn');
+      requestAccessButtons.forEach(button => {
+        button.addEventListener('click', async () => {
+          const bookId = button.dataset.bookId;
+          const bookTitle = button.dataset.bookTitle;
+          const messageDiv = document.getElementById(`requestMessage-${bookId}`);
+
+          const isAuthenticated = await checkSession();
+          if (!isAuthenticated) {
+            messageDiv.textContent = 'Session expired. Please log in again.';
+            messageDiv.className = 'request-message error';
+            setTimeout(() => { window.location.href = '/login'; }, 2000);
+            return;
+          }
+
+          if (!confirm(`Request access to "${bookTitle}"?`)) return;
+
+          messageDiv.textContent = 'Sending request...';
+          messageDiv.className = 'request-message';
+
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            const response = await fetch('/request-access', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+              },
+              body: JSON.stringify({ bookId }),
+              signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            console.log(`Request access for book ${bookId} response status:`, response.status);
+            const contentType = response.headers.get('content-type');
+            console.log(`Request access for book ${bookId} content-type:`, contentType);
+
+            if (response.redirected && response.url.includes('/login')) {
+              messageDiv.textContent = 'Session expired. Please log in again.';
+              messageDiv.className = 'request-message error';
+              setTimeout(() => { window.location.href = '/login'; }, 2000);
+              return;
+            }
+
+            if (!contentType || !contentType.includes('application/json')) {
+              const text = await response.text();
+              console.error(`Request access for book ${bookId} non-JSON response:`, text.substring(0, 500));
+              throw new Error('Server returned non-JSON response');
+            }
+
+            const data = await response.json();
+            if (response.ok && data.success) {
+              messageDiv.textContent = `Access request for "${bookTitle}" sent successfully!`;
+              messageDiv.className = 'request-message success';
+              button.textContent = 'Request Sent';
+              button.disabled = true;
+              button.classList.remove('btn-secondary');
+              button.classList.add('disabled');
+            } else {
+              messageDiv.textContent = data.message || 'Failed to send access request.';
+              messageDiv.className = 'request-message error';
+            }
+          } catch (err) {
+            console.error(`Request access for book ${bookId} error:`, err);
+            messageDiv.textContent = err.name === 'AbortError' ? 'Request timed out.' : `Error: ${err.message}`;
+            messageDiv.className = 'request-message error';
+          }
+        });
+      });
+    });
+  </script>
+
+  <% if (user) { %>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+      const userId = '<%= user._id %>';
+      const profession = '<%= user.profession %>';
+
+      socket.emit('joinProfession', { userId, profession });
+
+      socket.on('chatHistory', (messages) => {
+        const chatMessages = document.getElementById('chatMessages');
+        chatMessages.innerHTML = '';
+        messages.forEach(msg => {
+          const messageElement = document.createElement('div');
+          messageElement.classList.add('message');
+          messageElement.innerHTML = `<strong>${msg.user.username}</strong>: ${msg.content} <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>`;
+          chatMessages.appendChild(messageElement);
+        });
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      });
+
+      socket.on('chatMessage', (msg) => {
+        const chatMessages = document.getElementById('chatMessages');
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('message');
+        messageElement.innerHTML = `<strong>${msg.user.username}</strong>: ${msg.content} <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>`;
+        chatMessages.appendChild(messageElement);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      });
+
+      socket.on('notification', (notification) => {
+        alert(notification.message);
+      });
+
+      function sendMessage() {
+        const input = document.getElementById('chatInput');
+        const content = input.value.trim();
+        if (content) {
+          socket.emit('chatMessage', { userId, profession, content });
+          input.value = '';
+        }
+      }
+
+      function toggleChat() {
+        const chatWindow = document.getElementById('chatWindow');
+        chatWindow.classList.toggle('open');
+      }
+
+      document.getElementById('chatInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          sendMessage();
+        }
+      });
+    </script>
+  <% } %>
+</body>
+</html>

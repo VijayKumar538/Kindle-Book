@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Library - BookHive</title>
   <link rel="stylesheet" href="/css/style.css?v=20241024232623">
+  <link rel="stylesheet" href="/css/chat.css">
 </head>
 <body>
   <header>
@@ -13,8 +14,8 @@
         <img src="/images/logo.jpg" alt="BookHive Logo" class="logo">
       </div>
       <nav>
+        <a href="/news">NewsToday</a>
         <a href="/library" class="active">My Library</a>
-        <!-- <a href="/pinned">Pinned Books</a> -->
         <a href="/explore">Explore</a>
         <a href="/upload">Upload</a>
         <a href="/account">Account</a>
@@ -33,7 +34,7 @@
       </form>
     </div>
     
-    <div class="action-buttons">
+    <div class="share-action-buttons">
       <div class="share-container">
         <div class="share-toggle" title="Share Library">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -95,10 +96,6 @@
           <div class="book-card" data-id="<%= book._id %>">
             <div class="book-cover">
               <img src="/thumbnail/<%= book._id %>" alt="<%= book.title %> cover" class="thumbnail" onerror="this.src='/images/default-thumbnail.png'">
-              <!-- <div class="pin-icon <%= pinnedBooks.includes(book._id.toString()) ? 'pinned' : '' %>" data-book-id="<%= book._id %>">
-                <span class="pin-count"><%= book.pinCount || 0 %></span>
-                📌
-              </div> -->
             </div>
             <div class="book-info">
               <h3><%= book.title %></h3>
@@ -138,6 +135,23 @@
       <button id="saveVisibility" class="btn btn-primary">Save</button>
     </div>
   </div>
+  
+  <% if (user) { %>
+    <div class="chat-icon" onclick="toggleChat()">
+      <img src="/images/chat-icon.png" alt="Chat" />
+    </div>
+    <div class="chat-window" id="chatWindow">
+      <div class="chat-header">
+        <h3><%= user.profession.charAt(0).toUpperCase() + user.profession.slice(1) %> Group Chat</h3>
+        <button onclick="toggleChat()">Close</button>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-input">
+        <input type="text" id="chatInput" placeholder="Type a message..." />
+        <button onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+  <% } %>
   
   <footer>
     <div class="container">
@@ -332,7 +346,7 @@
         });
       }
 
-      // Existing functionality (delete, share, pin, search)
+      // Existing functionality (delete, share, search)
       const deleteButtons = document.querySelectorAll('.delete-book');
       deleteButtons.forEach(button => {
         button.addEventListener('click', async (e) => {
@@ -401,7 +415,7 @@
         toggleAccessListSection(visibilitySelect.value);
       });
 
-      saveBtn.addEventListener('click', async () => {
+      document.getElementById('saveVisibility').addEventListener('click', async () => {
         const newVisibility = visibilitySelect.value;
         try {
           const response = await fetch(`/book/${currentBookId}/visibility`, {
@@ -473,27 +487,6 @@
         }
       }
 
-      const pinButtons = document.querySelectorAll('.pin-icon');
-      pinButtons.forEach(button => {
-        button.addEventListener('click', async (e) => {
-          e.preventDefault();
-          const bookId = button.dataset.bookId;
-          try {
-            const response = await fetch(`/book/${bookId}/pin`, { method: 'POST' });
-            const data = await response.json();
-            if (data.success) {
-              button.classList.toggle('pinned');
-              const pinCountSpan = button.querySelector('.pin-count');
-              pinCountSpan.textContent = data.pinCount;
-            } else {
-              alert('Failed to update pin status');
-            }
-          } catch (err) {
-            alert('Error updating pin');
-          }
-        });
-      });
-
       const searchInput = document.getElementById('searchInput');
       const searchButton = document.getElementById('searchButton');
       const bookGrid = document.getElementById('bookGrid');
@@ -521,17 +514,12 @@
               `;
             } else {
               data.books.forEach(book => {
-                const isPinned = '<%= user.pinnedBooks %>'.includes(book._id);
                 const bookCard = document.createElement('div');
                 bookCard.className = 'book-card';
                 bookCard.dataset.id = book._id;
                 bookCard.innerHTML = `
                   <div class="book-cover">
                     <img src="/thumbnail/${book._id}" alt="${book.title} cover" class="thumbnail" onerror="this.src='/images/default-thumbnail.png'">
-                    <div class="pin-icon ${isPinned ? 'pinned' : ''}" data-book-id="${book._id}">
-                      <span class="pin-count">${book.pinCount || 0}</span>
-                      📌
-                    </div>
                   </div>
                   <div class="book-info">
                     <h3>${book.title}</h3>
@@ -584,26 +572,6 @@
           });
         });
 
-        document.querySelectorAll('.pin-icon').forEach(button => {
-          button.addEventListener('click', async (e) => {
-            e.preventDefault();
-            const bookId = button.dataset.bookId;
-            try {
-              const response = await fetch(`/book/${bookId}/pin`, { method: 'POST' });
-              const data = await response.json();
-              if (data.success) {
-                button.classList.toggle('pinned');
-                const pinCountSpan = button.querySelector('.pin-count');
-                pinCountSpan.textContent = data.pinCount;
-              } else {
-                alert('Failed to update pin status');
-              }
-            } catch (err) {
-              alert('Error updating pin');
-            }
-          });
-        });
-
         document.querySelectorAll('.manage-sharing').forEach(button => {
           button.addEventListener('click', async (e) => {
             const bookCard = e.target.closest('.book-card');
@@ -623,5 +591,57 @@
       }
     });
   </script>
+
+  <% if (user) { %>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+      const userId = '<%= user._id %>';
+      const profession = '<%= user.profession %>';
+
+      socket.emit('joinProfession', { userId, profession });
+
+      socket.on('chatHistory', (messages) => {
+        const chatMessages = document.getElementById('chatMessages');
+        chatMessages.innerHTML = '';
+        messages.forEach(msg => {
+          const messageElement = document.createElement('div');
+          messageElement.classList.add('message');
+          messageElement.innerHTML = `<strong>${msg.user.username}</strong>: ${msg.content} <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>`;
+          chatMessages.appendChild(messageElement);
+        });
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      });
+
+      socket.on('chatMessage', (msg) => {
+        const chatMessages = document.getElementById('chatMessages');
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('message');
+        messageElement.innerHTML = `<strong>${msg.user.username}</strong>: ${msg.content} <span>${new Date(msg.timestamp).toLocaleTimeString()}</span>`;
+        chatMessages.appendChild(messageElement);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      });
+
+      function sendMessage() {
+        const input = document.getElementById('chatInput');
+        const content = input.value.trim();
+        if (content) {
+          socket.emit('chatMessage', { userId, profession, content });
+          input.value = '';
+        }
+      }
+
+      function toggleChat() {
+        const chatWindow = document.getElementById('chatWindow');
+        chatWindow.classList.toggle('open');
+      }
+
+      document.getElementById('chatInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          sendMessage();
+        }
+      });
+    </script>
+  <% } %>
 </body>
 </html>

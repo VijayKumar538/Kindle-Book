@@ -6,8 +6,12 @@ const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const path = require('path');
 const sanitizeHtml = require('sanitize-html');
+const http = require('http');
+const socketIo = require('socket.io');
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
 const PORT = process.env.PORT || 3000;
 
 // Prevent caching
@@ -38,9 +42,9 @@ app.use(session({
   secret: 'your-secret-key',
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({ mongoUrl: 'mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qqrud.mongodb.net/MyLibrary1?retryWrites=true&w=majority&appName=MyLibrary' }),
+  store: MongoStore.create({ mongoUrl: 'mongodb://localhost:27017/bookhive' }),
   cookie: { 
-    maxAge: SESSION_TIMEOUT, // Session expires after 30 minutes
+    maxAge: SESSION_TIMEOUT,
     secure: false, // Set to true if using HTTPS
     httpOnly: true
   }
@@ -52,14 +56,12 @@ app.use((req, res, next) => {
     const now = Date.now();
     const lastActivity = req.session.lastActivity || now;
     
-    // Check if session has been inactive for too long
     if (now - lastActivity > SESSION_TIMEOUT) {
       req.session.destroy(() => {
-        res.clearCookie('connect.sid'); // Clear the session cookie
+        res.clearCookie('connect.sid');
         return res.redirect('/login');
       });
     } else {
-      // Update last activity timestamp
       req.session.lastActivity = now;
       next();
     }
@@ -70,11 +72,26 @@ app.use((req, res, next) => {
 
 // Debug middleware for form submissions
 app.use((req, res, next) => {
-  if (req.method === 'POST' && ['/account/update-profile', '/account/update-password', '/feedback'].includes(req.path)) {
+  if (req.method === 'POST' && ['/account/update-profile', '/account/update-password', '/feedback', '/account/delete', '/request-access'].includes(req.path)) {
     console.log(`Request to ${req.path}:`, {
       headers: req.headers,
       body: req.body
     });
+    const originalJson = res.json;
+    const originalRender = res.render;
+    const originalRedirect = res.redirect;
+    res.json = function (data) {
+      console.log(`Response to ${req.path}: JSON`, data);
+      return originalJson.apply(res, arguments);
+    };
+    res.render = function (view, locals) {
+      console.log(`Response to ${req.path}: Render view=${view}`, locals);
+      return originalRender.apply(res, arguments);
+    };
+    res.redirect = function (url) {
+      console.log(`Response to ${req.path}: Redirect to ${url}`);
+      return originalRedirect.apply(res, arguments);
+    };
   }
   next();
 });
@@ -83,10 +100,9 @@ app.use((req, res, next) => {
 const formUpload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
-    // Allow no files, only form fields
     cb(null, false);
   }
-}).none(); // Expect no files, only fields
+}).none();
 
 // Middleware to fetch user and note
 const fetchUserAndNote = async (req, res, next) => {
@@ -106,11 +122,33 @@ const fetchUserAndNote = async (req, res, next) => {
 app.use(fetchUserAndNote);
 
 // Connect to MongoDB
-mongoose.connect('mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qqrud.mongodb.net/MyLibrary1?retryWrites=true&w=majority&appName=MyLibrary', { 
+mongoose.connect('mongodb://localhost:27017/bookhive', { 
   useNewUrlParser: true, 
   useUnifiedTopology: true 
-}).then(() => {
+}).then(async () => {
   console.log('Connected to MongoDB');
+  try {
+    const adminExists = await User.findOne({ username: 'admin' });
+    if (!adminExists) {
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      const adminUser = new User({
+        username: 'admin',
+        email: 'admin@bookhive.com',
+        password: hashedPassword,
+        profession: 'software',
+        isAdmin: true
+      });
+      await adminUser.save();
+      console.log('Admin user created: username=admin, password=admin123');
+      const adminNote = new Note({
+        user: adminUser._id,
+        content: 'Admin notes'
+      });
+      await adminNote.save();
+    }
+  } catch (err) {
+    console.error('Error creating admin user:', err);
+  }
 }).catch(err => {
   console.error('MongoDB connection error:', err);
 });
@@ -120,10 +158,16 @@ const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  profession: { 
+    type: String, 
+    required: true, 
+    enum: ['software', 'agriculture', 'medicine', 'lawyer'] 
+  },
   createdAt: { type: Date, default: Date.now },
   storageUsed: { type: Number, default: 0 },
   storageLimit: { type: Number, default: 1024 * 1024 * 500 },
-  pinnedBooks: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Book' }]
+  pinnedBooks: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Book' }],
+  isAdmin: { type: Boolean, default: false }
 });
 
 const bookSchema = new mongoose.Schema({
@@ -171,11 +215,26 @@ const noteSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-// New Feedback schema
 const feedbackSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   content: { type: String, required: true },
   submittedAt: { type: Date, default: Date.now }
+});
+
+const messageSchema = new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  profession: { type: String, required: true, enum: ['software', 'agriculture', 'medicine', 'lawyer'] },
+  content: { type: String, required: true },
+  timestamp: { type: Date, default: Date.now }
+});
+
+const newsSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  content: { type: String, required: true },
+  image: { type: Buffer },
+  imageType: { type: String },
+  createdAt: { type: Date, default: Date.now },
+  postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 });
 
 // Models
@@ -183,7 +242,9 @@ const User = mongoose.model('User', userSchema);
 const Book = mongoose.model('Book', bookSchema);
 const Request = mongoose.model('Request', requestSchema);
 const Note = mongoose.model('Note', noteSchema);
-const Feedback = mongoose.model('Feedback', feedbackSchema); // Added Feedback model
+const Feedback = mongoose.model('Feedback', feedbackSchema);
+const Message = mongoose.model('Message', messageSchema);
+const News = mongoose.model('News', newsSchema);
 
 // Configure multer for file uploads (PDFs)
 const upload = multer({
@@ -199,6 +260,19 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }
 });
 
+const newsImageUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPEG and PNG images are allowed'), false);
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024 }
+});
+
 // Helper function to determine file type from MIME type
 function getFileTypeFromMime(mimeType) {
   if (mimeType === 'application/pdf') return 'pdf';
@@ -210,7 +284,20 @@ const isAuthenticated = (req, res, next) => {
   if (req.session.userId) {
     return next();
   }
-  res.status(401).json({ success: false, message: 'User not authenticated' }); // Updated to return JSON
+  res.redirect('/login');
+};
+
+// Admin authentication middleware
+const isAdmin = async (req, res, next) => {
+  if (!req.session.userId) {
+    return res.redirect('/login');
+  }
+  const user = await User.findById(req.session.userId);
+  if (!user || !user.isAdmin) {
+    return res.status(403).render('error', { message: 'Admin access required', user: req.user, note: req.note ? req.note.content : '' });
+  }
+  req.user = user;
+  next();
 };
 
 // Error handling middleware for multer
@@ -221,6 +308,46 @@ app.use((err, req, res, next) => {
     return res.status(400).render('upload', { error: err.message, user: req.user, note: req.note ? req.note.content : '' });
   }
   next();
+});
+
+// Socket.IO setup for profession-based chat and notifications
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  socket.on('joinProfession', async ({ userId, profession }) => {
+    socket.join(profession);
+    socket.join(userId.toString()); // Join user-specific room for notifications
+    console.log(`User ${userId} joined ${profession} chat and user room ${userId}`);
+    
+    const messages = await Message.find({ profession })
+      .sort({ timestamp: -1 })
+      .limit(50)
+      .populate('user', 'username');
+    socket.emit('chatHistory', messages.reverse());
+  });
+
+  socket.on('chatMessage', async ({ userId, profession, content }) => {
+    if (!content || content.trim() === '') return;
+    
+    const sanitizedContent = sanitizeHtml(content, {
+      allowedTags: [],
+      allowedAttributes: {}
+    });
+
+    const message = new Message({
+      user: userId,
+      profession,
+      content: sanitizedContent
+    });
+    await message.save();
+
+    const populatedMessage = await Message.findById(message._id).populate('user', 'username');
+    io.to(profession).emit('chatMessage', populatedMessage);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
 });
 
 // Routes
@@ -234,9 +361,12 @@ app.get('/signup', (req, res) => {
 
 app.post('/signup', async (req, res) => {
   try {
-    const { username, email, password } = req.body;
-    if (!username || !email || !password) {
+    const { username, email, password, profession } = req.body;
+    if (!username || !email || !password || !profession) {
       return res.status(400).render('signup', { error: 'All fields are required', user: req.user, note: req.note ? req.note.content : '' });
+    }
+    if (!['software', 'agriculture', 'medicine', 'lawyer'].includes(profession)) {
+      return res.status(400).render('signup', { error: 'Invalid profession selected', user: req.user, note: req.note ? req.note.content : '' });
     }
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
@@ -246,10 +376,10 @@ app.post('/signup', async (req, res) => {
     const newUser = new User({
       username,
       email,
-      password: hashedPassword
+      password: hashedPassword,
+      profession
     });
     await newUser.save();
-    // Create a note document for the new user
     const newNote = new Note({
       user: newUser._id,
       content: ''
@@ -263,7 +393,7 @@ app.post('/signup', async (req, res) => {
 });
 
 app.get('/login', (req, res) => {
-  res.render('login', { user: req.user, note: req.note ? req.note.content : '' });
+  res.render('login', { error: null, user: req.user, note: req.note ? req.note.content : '' });
 });
 
 app.post('/login', async (req, res) => {
@@ -281,8 +411,12 @@ app.post('/login', async (req, res) => {
       return res.status(400).render('login', { error: 'Invalid credentials', user: req.user, note: req.note ? req.note.content : '' });
     }
     req.session.userId = user._id;
-    req.session.lastActivity = Date.now(); // Initialize last activity
-    res.redirect('/library');
+    req.session.lastActivity = Date.now();
+    if (user.isAdmin) {
+      res.redirect('/admin');
+    } else {
+      res.redirect('/library');
+    }
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).render('login', { error: 'Server error', user: req.user, note: req.note ? req.note.content : '' });
@@ -295,14 +429,17 @@ app.get('/logout', (req, res) => {
       console.error('Logout error:', err);
       return res.status(500).send('Failed to logout');
     }
-    res.clearCookie('connect.sid'); // Explicitly clear session cookie
-    res.redirect('/');
+    res.clearCookie('connect.sid');
+    res.redirect('/login');
   });
 });
 
 app.get('/library', isAuthenticated, async (req, res) => {
   try {
     const user = req.user;
+    if (user.isAdmin) {
+      return res.redirect('/admin');
+    }
     const books = await Book.find({ uploadedBy: req.session.userId });
     res.render('library', { 
       books, 
@@ -319,6 +456,9 @@ app.get('/library', isAuthenticated, async (req, res) => {
 app.get('/pinned', isAuthenticated, async (req, res) => {
   try {
     const user = req.user;
+    if (user.isAdmin) {
+      return res.redirect('/admin');
+    }
     await user.populate('pinnedBooks');
     res.render('pinned', {
       pinnedBooks: user.pinnedBooks,
@@ -338,6 +478,9 @@ app.post('/book/:bookId/pin', isAuthenticated, async (req, res) => {
     if (!user) {
       console.error(`User not found for ID: ${req.session.userId}`);
       return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    if (user.isAdmin) {
+      return res.status(403).json({ success: false, message: 'Admins cannot pin books' });
     }
     const book = await Book.findById(bookId);
     if (!book) {
@@ -367,11 +510,19 @@ app.post('/book/:bookId/pin', isAuthenticated, async (req, res) => {
 });
 
 app.get('/upload', isAuthenticated, (req, res) => {
+  const user = req.user;
+  if (user.isAdmin) {
+    return res.redirect('/admin');
+  }
   res.render('upload', { user: req.user, note: req.note ? req.note.content : '' });
 });
 
 app.post('/upload', isAuthenticated, upload.single('file'), async (req, res) => {
   try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.redirect('/admin');
+    }
     if (!req.file) {
       return res.status(400).render('upload', { error: 'Please upload a file', user: req.user, note: req.note ? req.note.content : '' });
     }
@@ -380,7 +531,6 @@ app.post('/upload', isAuthenticated, upload.single('file'), async (req, res) => 
     if (!['private', 'public', 'restricted'].includes(visibility)) {
       return res.status(400).render('upload', { error: 'Invalid visibility option', user: req.user, note: req.note ? req.note.content : '' });
     }
-    const user = await User.findById(req.session.userId);
     const fileSize = req.file.size;
     if (user.storageUsed + fileSize > user.storageLimit) {
       return res.status(400).render('upload', {
@@ -418,6 +568,10 @@ app.post('/upload', isAuthenticated, upload.single('file'), async (req, res) => 
 
 app.get('/view/:bookId', isAuthenticated, async (req, res) => {
   try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.redirect('/admin');
+    }
     const book = await Book.findById(req.params.bookId);
     if (!book) {
       return res.status(404).render('error', { message: 'Book not found', user: req.user, note: req.note ? req.note.content : '' });
@@ -437,6 +591,10 @@ app.get('/view/:bookId', isAuthenticated, async (req, res) => {
 
 app.get('/file/:bookId', isAuthenticated, async (req, res) => {
   try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.status(403).send('Admins cannot access this route');
+    }
     const book = await Book.findById(req.params.bookId);
     if (!book) {
       return res.status(404).send('File not found');
@@ -482,11 +640,14 @@ app.get('/thumbnail/:bookId', async (req, res) => {
 
 app.delete('/book/:id', isAuthenticated, async (req, res) => {
   try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.status(403).json({ success: false, message: 'Admins cannot delete books' });
+    }
     const book = await Book.findOne({ _id: req.params.id, uploadedBy: req.session.userId });
     if (!book) {
       return res.status(404).json({ success: false, message: 'Book not found' });
     }
-    const user = await User.findById(req.session.userId);
     user.storageUsed = Math.max(0, user.storageUsed - book.fileSize);
     await user.save();
     await User.updateMany(
@@ -503,6 +664,10 @@ app.delete('/book/:id', isAuthenticated, async (req, res) => {
 
 app.put('/book/:bookId/visibility', isAuthenticated, async (req, res) => {
   try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.status(403).json({ success: false, message: 'Admins cannot modify book visibility' });
+    }
     const { visibility } = req.body;
     if (!['private', 'public', 'restricted'].includes(visibility)) {
       return res.status(400).json({ success: false, message: 'Invalid visibility' });
@@ -528,6 +693,10 @@ app.put('/book/:bookId/visibility', isAuthenticated, async (req, res) => {
 
 app.get('/book/:bookId/access-list', isAuthenticated, async (req, res) => {
   try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.status(403).json({ success: false, message: 'Admins cannot access this route' });
+    }
     const book = await Book.findById(req.params.bookId);
     if (!book) {
       return res.status(404).json({ success: false, message: 'Book not found' });
@@ -545,6 +714,10 @@ app.get('/book/:bookId/access-list', isAuthenticated, async (req, res) => {
 
 app.delete('/book/:bookId/access/:userId', isAuthenticated, async (req, res) => {
   try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.status(403).json({ success: false, message: 'Admins cannot access this route' });
+    }
     const book = await Book.findById(req.params.bookId);
     if (!book) {
       return res.status(404).json({ success: false, message: 'Book not found' });
@@ -564,6 +737,9 @@ app.delete('/book/:bookId/access/:userId', isAuthenticated, async (req, res) => 
 app.get('/explore', isAuthenticated, async (req, res) => {
   try {
     const user = req.user;
+    if (user.isAdmin) {
+      return res.redirect('/admin');
+    }
     const publicBooks = await Book.find({
       visibility: 'public',
       uploadedBy: { $ne: req.session.userId }
@@ -595,12 +771,16 @@ app.get('/explore', isAuthenticated, async (req, res) => {
     });
   } catch (err) {
     console.error('Explore error:', err);
-    res.status(500).render('error', { message: 'Failed to load explore page???', user: req.user, note: req.note ? req.note.content : '' });
+    res.status(500).render('error', { message: 'Failed to load explore page', user: req.user, note: req.note ? req.note.content : '' });
   }
 });
 
 app.get('/my-requests', isAuthenticated, async (req, res) => {
   try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.redirect('/admin');
+    }
     const sentRequests = await Request.find({ requestedBy: req.session.userId })
       .populate('book', 'title author')
       .populate('bookOwner', 'username');
@@ -613,6 +793,10 @@ app.get('/my-requests', isAuthenticated, async (req, res) => {
 
 app.get('/access-requests', isAuthenticated, async (req, res) => {
   try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.redirect('/admin');
+    }
     const receivedRequests = await Request.find({
       bookOwner: req.session.userId,
       status: 'pending'
@@ -626,35 +810,12 @@ app.get('/access-requests', isAuthenticated, async (req, res) => {
   }
 });
 
-app.post('/request-access/:bookId', isAuthenticated, async (req, res) => {
-  try {
-    const book = await Book.findById(req.params.bookId);
-    if (!book) {
-      return res.status(404).json({ success: false, message: 'Book not found' });
-    }
-    const existingRequest = await Request.findOne({
-      book: book._id,
-      requestedBy: req.session.userId,
-      status: 'pending'
-    });
-    if (existingRequest) {
-      return res.json({ success: false, message: 'Access request already sent' });
-    }
-    const request = new Request({
-      book: book._id,
-      requestedBy: req.session.userId,
-      bookOwner: book.uploadedBy
-    });
-    await request.save();
-    res.json({ success: true, message: 'Access request sent' });
-  } catch (err) {
-    console.error('Request access error:', err);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
 app.post('/handle-request/:requestId', isAuthenticated, async (req, res) => {
   try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.status(403).json({ success: false, message: 'Admins cannot handle requests' });
+    }
     const { action } = req.body;
     if (!['approve', 'decline'].includes(action)) {
       return res.status(400).json({ success: false, message: 'Invalid action' });
@@ -686,6 +847,9 @@ app.post('/handle-request/:requestId', isAuthenticated, async (req, res) => {
 app.get('/account', isAuthenticated, async (req, res) => {
   try {
     const user = req.user;
+    if (user.isAdmin) {
+      return res.redirect('/admin');
+    }
     const storageUsedMB = (user.storageUsed / (1024 * 1024)).toFixed(1);
     const storageLimitMB = user.storageLimit / (1024 * 1024);
     const storagePercentage = ((user.storageUsed / user.storageLimit) * 100).toFixed(0);
@@ -706,9 +870,9 @@ app.get('/account', isAuthenticated, async (req, res) => {
 
 app.get('/account/storage-info', isAuthenticated, async (req, res) => {
   try {
-    const user = await User.findById(req.session.userId).select('storageUsed storageLimit');
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.status(403).json({ success: false, message: 'Admins cannot access this route' });
     }
     const storageUsedMB = (user.storageUsed / (1024 * 1024)).toFixed(1);
     const storageLimitMB = user.storageLimit / (1024 * 1024);
@@ -727,72 +891,85 @@ app.get('/account/storage-info', isAuthenticated, async (req, res) => {
 
 app.post('/account/update-profile', isAuthenticated, formUpload, async (req, res) => {
   try {
-    const { username, email, currentPassword } = req.body;
-    if (!username || !email || !currentPassword) {
-      if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'All fields required' });
-      }
-      return res.status(400).render('account', {
-        user: req.user,
-        storageUsedMB: (req.user.storageUsed / (1024 * 1024)).toFixed(1),
-        storageLimitMB: req.user.storageLimit / (1024 * 1024),
-        storagePercentage: ((req.user.storageUsed / req.user.storageLimit) * 100).toFixed(0),
-        error: 'All fields required',
-        success: null,
-        note: req.note ? req.note.content : ''
-      });
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.redirect('/admin');
     }
-    const user = await User.findById(req.session.userId);
-    if (!await bcrypt.compare(currentPassword, user.password)) {
-      if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'Incorrect password' });
+    const { username, email, currentPassword } = req.body;
+    const isAjax = req.get('X-Requested-With') === 'XMLHttpRequest';
+
+    if (!username || !email || !currentPassword) {
+      const errorMsg = 'All fields required';
+      if (isAjax) {
+        return res.status(400).json({ success: false, message: errorMsg });
       }
       return res.status(400).render('account', {
         user,
         storageUsedMB: (user.storageUsed / (1024 * 1024)).toFixed(1),
         storageLimitMB: user.storageLimit / (1024 * 1024),
         storagePercentage: ((user.storageUsed / user.storageLimit) * 100).toFixed(0),
-        error: 'Incorrect password',
+        error: errorMsg,
         success: null,
         note: req.note ? req.note.content : ''
       });
     }
+
+    if (!await bcrypt.compare(currentPassword, user.password)) {
+      const errorMsg = 'Incorrect password';
+      if (isAjax) {
+        return res.status(400).json({ success: false, message: errorMsg });
+      }
+      return res.status(400).render('account', {
+        user,
+        storageUsedMB: (user.storageUsed / (1024 * 1024)).toFixed(1),
+        storageLimitMB: user.storageLimit / (1024 * 1024),
+        storagePercentage: ((user.storageUsed / user.storageLimit) * 100).toFixed(0),
+        error: errorMsg,
+        success: null,
+        note: req.note ? req.note.content : ''
+      });
+    }
+
     const existingUser = await User.findOne({
       $or: [{ username }, { email }],
       _id: { $ne: req.session.userId }
     });
     if (existingUser) {
-      if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'Username or email taken' });
+      const errorMsg = 'Username or email taken';
+      if (isAjax) {
+        return res.status(400).json({ success: false, message: errorMsg });
       }
       return res.status(400).render('account', {
         user,
         storageUsedMB: (user.storageUsed / (1024 * 1024)).toFixed(1),
         storageLimitMB: user.storageLimit / (1024 * 1024),
         storagePercentage: ((user.storageUsed / user.storageLimit) * 100).toFixed(0),
-        error: 'Username or email taken',
+        error: errorMsg,
         success: null,
         note: req.note ? req.note.content : ''
       });
     }
+
     user.username = username;
     user.email = email;
     await user.save();
-    if (req.xhr) {
-      return res.json({ success: true, message: 'Profile updated' });
+
+    if (isAjax) {
+      return res.json({ success: true, message: 'Profile updated successfully' });
     }
     res.redirect('/account');
   } catch (err) {
     console.error('Update profile error:', err);
-    if (req.xhr) {
-      return res.status(500).json({ success: false, message: 'Server error' });
+    const errorMsg = 'Server error';
+    if (req.get('X-Requested-With') === 'XMLHttpRequest') {
+      return res.status(500).json({ success: false, message: errorMsg });
     }
     res.status(500).render('account', {
       user: req.user,
       storageUsedMB: (req.user.storageUsed / (1024 * 1024)).toFixed(1),
       storageLimitMB: req.user.storageLimit / (1024 * 1024),
       storagePercentage: ((req.user.storageUsed / req.user.storageLimit) * 100).toFixed(0),
-      error: 'Server error',
+      error: errorMsg,
       success: null,
       note: req.note ? req.note.content : ''
     });
@@ -801,68 +978,81 @@ app.post('/account/update-profile', isAuthenticated, formUpload, async (req, res
 
 app.post('/account/update-password', isAuthenticated, formUpload, async (req, res) => {
   try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.redirect('/admin');
+    }
     const { currentPassword, newPassword, confirmPassword } = req.body;
+    const isAjax = req.get('X-Requested-With') === 'XMLHttpRequest';
+
     if (!currentPassword || !newPassword || !confirmPassword) {
-      if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'All fields required' });
+      const errorMsg = 'All fields required';
+      if (isAjax) {
+        return res.status(400).json({ success: false, message: errorMsg });
       }
       return res.status(400).render('account', {
-        user: req.user,
-        storageUsedMB: (req.user.storageUsed / (1024 * 1024)).toFixed(1),
-        storageLimitMB: req.user.storageLimit / (1024 * 1024),
-        storagePercentage: ((req.user.storageUsed / req.user.storageLimit) * 100).toFixed(0), 
-        error: 'All fields required',
+        user,
+        storageUsedMB: (user.storageUsed / (1024 * 1024)).toFixed(1),
+        storageLimitMB: user.storageLimit / (1024 * 1024),
+        storagePercentage: ((user.storageUsed / user.storageLimit) * 100).toFixed(0),
+        error: errorMsg,
         success: null,
         note: req.note ? req.note.content : ''
       });
     }
-    const user = await User.findById(req.session.userId);
+
     if (!await bcrypt.compare(currentPassword, user.password)) {
-      if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'Incorrect password' });
+      const errorMsg = 'Incorrect password';
+      if (isAjax) {
+        return res.status(400).json({ success: false, message: errorMsg });
       }
       return res.status(400).render('account', {
         user,
         storageUsedMB: (user.storageUsed / (1024 * 1024)).toFixed(1),
         storageLimitMB: user.storageLimit / (1024 * 1024),
         storagePercentage: ((user.storageUsed / user.storageLimit) * 100).toFixed(0),
-        error: 'Incorrect password',
+        error: errorMsg,
         success: null,
         note: req.note ? req.note.content : ''
       });
     }
+
     if (newPassword !== confirmPassword) {
-      if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'Passwords do not match' });
+      const errorMsg = 'Passwords do not match';
+      if (isAjax) {
+        return res.status(400).json({ success: false, message: errorMsg });
       }
       return res.status(400).render('account', {
         user,
         storageUsedMB: (user.storageUsed / (1024 * 1024)).toFixed(1),
         storageLimitMB: user.storageLimit / (1024 * 1024),
         storagePercentage: ((user.storageUsed / user.storageLimit) * 100).toFixed(0),
-        error: 'Passwords do not match',
+        error: errorMsg,
         success: null,
         note: req.note ? req.note.content : ''
       });
     }
+
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
-    if (req.xhr) {
-      return res.json({ success: true, message: 'Password updated' });
+
+    if (isAjax) {
+      return res.json({ success: true, message: 'Password updated successfully' });
     }
     res.redirect('/account');
   } catch (err) {
     console.error('Update password error:', err);
-    if (req.xhr) {
-      return res.status(500).json({ success: false, message: 'Server error' });
+    const errorMsg = 'Server error';
+    if (req.get('X-Requested-With') === 'XMLHttpRequest') {
+      return res.status(500).json({ success: false, message: errorMsg });
     }
     res.status(500).render('account', {
       user: req.user,
       storageUsedMB: (req.user.storageUsed / (1024 * 1024)).toFixed(1),
       storageLimitMB: req.user.storageLimit / (1024 * 1024),
       storagePercentage: ((req.user.storageUsed / req.user.storageLimit) * 100).toFixed(0),
-      error: 'Server error',
-      success: personally,
+      error: errorMsg,
+      success: null,
       note: req.note ? req.note.content : ''
     });
   }
@@ -870,36 +1060,45 @@ app.post('/account/update-password', isAuthenticated, formUpload, async (req, re
 
 app.post('/account/delete', isAuthenticated, formUpload, async (req, res) => {
   try {
-    const { password, confirmDelete } = req.body;
-    if (!password || !confirmDelete) {
-      if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'Password and confirmation required' });
-      }
-      return res.status(400).render('account', {
-        user: req.user,
-        storageUsedMB: (req.user.storageUsed / (1024 * 1024)).toFixed(1),
-        storageLimitMB: req.user.storageLimit / (1024 * 1024),
-        storagePercentage: ((req.user.storageUsed / req.user.storageLimit) * 100).toFixed(0),
-        error: 'Password and confirmation required',
-        success: null,
-        note: req.note ? req.note.content : ''
-      });
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.redirect('/admin');
     }
-    const user = await User.findById(req.session.userId);
-    if (!await bcrypt.compare(password, user.password)) {
-      if (req.xhr) {
-        return res.status(400).json({ success: false, message: 'Incorrect password' });
+    const { password, confirmDelete } = req.body;
+    const isAjax = req.get('X-Requested-With') === 'XMLHttpRequest';
+
+    if (!password || !confirmDelete) {
+      const errorMsg = 'Password and confirmation required';
+      if (isAjax) {
+        return res.status(400).json({ success: false, message: errorMsg });
       }
       return res.status(400).render('account', {
         user,
         storageUsedMB: (user.storageUsed / (1024 * 1024)).toFixed(1),
         storageLimitMB: user.storageLimit / (1024 * 1024),
         storagePercentage: ((user.storageUsed / user.storageLimit) * 100).toFixed(0),
-        error: 'Incorrect password',
+        error: errorMsg,
         success: null,
         note: req.note ? req.note.content : ''
       });
     }
+
+    if (!await bcrypt.compare(password, user.password)) {
+      const errorMsg = 'Incorrect password';
+      if (isAjax) {
+        return res.status(400).json({ success: false, message: errorMsg });
+      }
+      return res.status(400).render('account', {
+        user,
+        storageUsedMB: (user.storageUsed / (1024 * 1024)).toFixed(1),
+        storageLimitMB: user.storageLimit / (1024 * 1024),
+        storagePercentage: ((user.storageUsed / user.storageLimit) * 100).toFixed(0),
+        error: errorMsg,
+        success: null,
+        note: req.note ? req.note.content : ''
+      });
+    }
+
     await Book.deleteMany({ uploadedBy: user._id });
     await Request.deleteMany({ $or: [{ requestedBy: user._id }, { bookOwner: user._id }] });
     await Book.updateMany(
@@ -907,33 +1106,38 @@ app.post('/account/delete', isAuthenticated, formUpload, async (req, res) => {
       { $pull: { accessList: user._id } }
     );
     await Note.deleteOne({ user: user._id });
-    await Feedback.deleteMany({ user: user._id }); // Clean up feedback on user deletion
+    await Feedback.deleteMany({ user: user._id });
+    await Message.deleteMany({ user: user._id });
     await User.deleteOne({ _id: user._id });
-    req.session.destroy(err => {
+
+    return req.session.destroy(err => {
       if (err) {
         console.error('Session destroy error:', err);
-        if (req.xhr) {
-          return res.status(500).json({ success: false, message: 'Server error' });
+        const errorMsg = 'Failed to delete account';
+        if (isAjax) {
+          return res.status(500).json({ success: false, message: errorMsg });
         }
-        return res.status(500).render('error', { message: 'Failed to delete account', user: null, note: '' });
+        return res.status(500).render('error', { message: errorMsg, user: null, note: '' });
       }
+
       res.clearCookie('connect.sid');
-      if (req.xhr) {
-        return res.json({ success: true, redirect: '/' });
+      if (isAjax) {
+        return res.json({ success: true, message: 'Account deleted successfully', redirect: '/' });
       }
       res.redirect('/');
     });
   } catch (err) {
     console.error('Delete account error:', err);
-    if (req.xhr) {
-      return res.status(500).json({ success: false, message: 'Server error' });
+    const errorMsg = 'Server error';
+    if (req.get('X-Requested-With') === 'XMLHttpRequest') {
+      return res.status(500).json({ success: false, message: errorMsg });
     }
     res.status(500).render('account', {
       user: req.user,
       storageUsedMB: (req.user.storageUsed / (1024 * 1024)).toFixed(1),
       storageLimitMB: req.user.storageLimit / (1024 * 1024),
       storagePercentage: ((req.user.storageUsed / req.user.storageLimit) * 100).toFixed(0),
-      error: 'Server error',
+      error: errorMsg,
       success: null,
       note: req.note ? req.note.content : ''
     });
@@ -942,6 +1146,10 @@ app.post('/account/delete', isAuthenticated, formUpload, async (req, res) => {
 
 app.post('/notes/save', isAuthenticated, async (req, res) => {
   try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.status(403).json({ success: false, message: 'Admins cannot save notes' });
+    }
     const { content } = req.body;
     let note = await Note.findOne({ user: req.session.userId });
     const sanitizedContent = sanitizeHtml(content || '', {
@@ -967,6 +1175,10 @@ app.post('/notes/save', isAuthenticated, async (req, res) => {
 
 app.get('/explore/search', isAuthenticated, async (req, res) => {
   try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.status(403).json({ success: false, message: 'Admins cannot access this route' });
+    }
     const { query } = req.query;
     if (!query) {
       return res.json({ books: [] });
@@ -1000,6 +1212,10 @@ app.get('/explore/search', isAuthenticated, async (req, res) => {
 
 app.get('/library/search', isAuthenticated, async (req, res) => {
   try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.status(403).json({ success: false, message: 'Admins cannot access this route' });
+    }
     const { query } = req.query;
     if (!query) {
       return res.json({ books: [] });
@@ -1020,9 +1236,12 @@ app.get('/library/search', isAuthenticated, async (req, res) => {
   }
 });
 
-// Feedback route (POST only)
 app.post('/feedback', isAuthenticated, async (req, res) => {
   try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.status(403).json({ success: false, message: 'Admins cannot submit feedback' });
+    }
     const { content } = req.body;
     if (!content || content.trim() === '') {
       return res.status(400).json({ success: false, message: 'Feedback content is required' });
@@ -1043,6 +1262,193 @@ app.post('/feedback', isAuthenticated, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.get('/news', isAuthenticated, async (req, res) => {
+  try {
+    const user = req.user;
+    if (user.isAdmin) {
+      return res.redirect('/admin');
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const newBooks = await Book.find({
+      uploadDate: { $gte: today },
+      visibility: { $in: ['public', 'restricted'] },
+      uploadedBy: { $ne: null } // Ensure uploadedBy exists
+    }).populate('uploadedBy', 'username').lean();
+
+    // Fetch pending requests for the user
+    const pendingRequests = await Request.find({
+      requestedBy: user._id,
+      status: 'pending'
+    }).select('book').lean();
+    const pendingBookIds = pendingRequests.map(req => req.book.toString());
+
+    const news = await News.find()
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .populate('postedBy', 'username')
+      .lean();
+
+    // Add hasPendingRequest and hasAccess to each book
+    const booksWithStatus = newBooks.map(book => {
+      const hasAccess = (
+        Array.isArray(book.accessList) && book.accessList.some(id => id.toString() === user._id.toString())
+      ) || (
+        book.uploadedBy && book.uploadedBy._id && book.uploadedBy._id.toString() === user._id.toString()
+      );
+      return {
+        ...book,
+        hasPendingRequest: pendingBookIds.includes(book._id.toString()),
+        hasAccess
+      };
+    });
+
+    res.render('news', {
+      newBooks: booksWithStatus,
+      news,
+      user,
+      note: req.note ? req.note.content : ''
+    });
+  } catch (err) {
+    console.error('News route error:', err.stack);
+    res.status(500).render('error', { message: 'Failed to load news page', user: req.user, note: req.note ? req.note.content : '' });
+  }
+});
+
+app.get('/news-image/:newsId', async (req, res) => {
+  try {
+    const news = await News.findById(req.params.newsId);
+    if (!news || !news.image) {
+      return res.status(404).send('Image not found');
+    }
+    res.set({
+      'Content-Type': news.imageType || 'image/jpeg',
+      'Content-Disposition': `inline; filename="news-${news._id}.jpg"`
+    });
+    res.send(news.image);
+  } catch (err) {
+    console.error('News image fetch error:', err);
+    res.status(500).send('Failed to load image');
+  }
+});
+
+app.get('/admin', isAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const professions = ['software', 'agriculture', 'medicine', 'lawyer'];
+    const conversations = {};
+
+    for (const profession of professions) {
+      const messages = await Message.find({ profession })
+        .sort({ timestamp: -1 })
+        .limit(50)
+        .populate('user', 'username')
+        .lean();
+      conversations[profession] = messages.reverse();
+    }
+
+    res.render('admin', {
+      user: req.user,
+      conversations,
+      success: req.query.success || null,
+      error: req.query.error || null,
+      note: req.note ? req.note.content : ''
+    });
+  } catch (err) {
+    console.error('Admin dashboard error:', err);
+    res.status(500).render('error', { message: 'Failed to load admin dashboard', user: req.user, note: req.note ? req.note.content : '' });
+  }
+});
+
+app.post('/admin/news/post', isAuthenticated, isAdmin, newsImageUpload.single('image'), async (req, res) => {
+  try {
+    const { title, content } = req.body;
+    if (!title || !content) {
+      return res.redirect('/admin?error=Title and content are required');
+    }
+    const sanitizedTitle = sanitizeHtml(title, { allowedTags: [], allowedAttributes: {} });
+    const sanitizedContent = sanitizeHtml(content, { allowedTags: [], allowedAttributes: {} });
+
+    const newsData = {
+      title: sanitizedTitle,
+      content: sanitizedContent,
+      postedBy: req.session.userId
+    };
+
+    if (req.file) {
+      newsData.image = req.file.buffer;
+      newsData.imageType = req.file.mimetype;
+    }
+
+    const news = new News(newsData);
+    await news.save();
+    res.redirect('/admin?success=News posted successfully');
+  } catch (err) {
+    console.error('News post error:', err);
+    res.redirect('/admin?error=Failed to post news');
+  }
+});
+
+app.post('/request-access', isAuthenticated, async (req, res) => {
+  try {
+    const { bookId } = req.body;
+    const user = req.user;
+
+    if (!bookId) {
+      return res.status(400).json({ success: false, message: 'Book ID is required' });
+    }
+
+    if (user.isAdmin) {
+      return res.status(403).json({ success: false, message: 'Admins cannot request access' });
+    }
+
+    const book = await Book.findById(bookId).populate('uploadedBy', 'username profession');
+    if (!book) {
+      return res.status(404).json({ success: false, message: 'Book not found' });
+    }
+
+    if (book.visibility !== 'restricted' || book.uploadedBy.toString() === user._id || book.accessList.includes(user._id)) {
+      return res.status(400).json({ success: false, message: 'Access already granted or not required' });
+    }
+
+    const existingRequest = await Request.findOne({
+      book: bookId,
+      requestedBy: user._id,
+      status: 'pending'
+    });
+    if (existingRequest) {
+      return res.status(400).json({ success: false, message: 'Access request already pending' });
+    }
+
+    const accessRequest = new Request({
+      book: bookId,
+      requestedBy: user._id,
+      bookOwner: book.uploadedBy._id,
+      status: 'pending'
+    });
+    await accessRequest.save();
+
+    // Send notification to book owner
+    const notificationMessage = new Message({
+      user: user._id,
+      profession: book.uploadedBy.profession,
+      content: `${user.username} has requested access to your book "${book.title}".`
+    });
+    await notificationMessage.save();
+
+    const populatedMessage = await Message.findById(notificationMessage._id).populate('user', 'username');
+    io.to(book.uploadedBy.profession).emit('chatMessage', populatedMessage);
+    io.to(book.uploadedBy._id.toString()).emit('notification', {
+      message: `${user.username} has requested access to your book "${book.title}".`,
+      requestId: accessRequest._id
+    });
+
+    return res.json({ success: true, message: 'Access request sent successfully' });
+  } catch (err) {
+    console.error('Request access error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
