@@ -1857,6 +1857,42 @@ footer p {
   background-color: #0056b3;
 }
 
+/* Added for Read More/Read Less */
+.news-content .content-preview {
+  max-height: 7.5em; /* Approx 5 lines with 1.5em line-height */
+  overflow: hidden;
+  position: relative;
+}
+.news-content .content-preview::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 100%;
+  height: 1.5em;
+  background: linear-gradient(to bottom, transparent, #fff);
+}
+.news-content .content-full {
+  display: none;
+}
+.news-content .read-more, .news-content .read-less {
+  color: #007bff;
+  cursor: pointer;
+  text-decoration: underline;
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 0.9em;
+}
+.news-content .read-more:hover, .news-content .read-less:hover {
+  color: #0056b3;
+}
+.news-item img {
+  max-width: 100%;
+  height: auto;
+  margin-top: 10px;
+  border-radius: 4px;
+}
+
 /* .btn {
   display: inline-block;
   padding: 8px 16px;

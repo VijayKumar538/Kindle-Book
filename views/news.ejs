@@ -7,6 +7,194 @@
   <title>NewsToday - BookHive</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="stylesheet" href="/css/chat.css">
+  <!-- Quill CDN -->
+  <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+  <!-- <style>
+    /* Existing styles */
+    .request-message {
+      margin-top: 10px;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    .request-message.success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .request-message.error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .btn {
+      padding: 8px 16px;
+      border-radius: 4px;
+      text-decoration: none;
+      display: inline-block;
+      margin: 5px 0;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background-color: #007bff;
+      color: white;
+    }
+    .btn-primary:hover {
+      background-color: #0056b3;
+    }
+    .btn-secondary {
+      background-color: #6c757d;
+      color: white;
+    }
+    .btn-secondary:hover {
+      background-color: #5a6268;
+    }
+    .btn.disabled {
+      background-color: #6c757d;
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+    .visibility-badge {
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.8em;
+      color: white;
+    }
+    .visibility-public {
+      background-color: #28a745;
+    }
+    .visibility-restricted {
+      background-color: #ffc107;
+    }
+    .share-message, .feedback-message {
+      margin-top: 5px;
+      font-size: 0.9em;
+    }
+    .share-message.success, .feedback-message.success {
+      color: #155724;
+    }
+    .share-message.error, .feedback-message.error {
+      color: #721c24;
+    }
+    .notes-area, .feedback-area, .share-options {
+      display: none;
+      position: absolute;
+      background-color: white;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      z-index: 1000;
+    }
+    .notes-area.active, .feedback-area.active, .share-options.active {
+      display: block;
+    }
+    .content-editable {
+      min-height: 100px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-y: auto;
+    }
+    .content-editable:empty:before {
+      content: attr(placeholder);
+      color: #6c757d;
+    }
+    .feedback-area textarea {
+      width: 100%;
+      height: 100px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+    .submit-feedback {
+      padding: 8px 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .submit-feedback:hover {
+      background-color: #0056b3;
+    }
+    .chat-window.open {
+      display: block;
+    }
+    /* Added for Read More/Read Less */
+    .news-content .content-preview {
+      max-height: 7.5em; /* Approx 5 lines with 1.5em line-height */
+      overflow: hidden;
+      position: relative;
+    }
+    .news-content .content-preview::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      right: 0;
+      width: 100%;
+      height: 1.5em;
+      background: linear-gradient(to bottom, transparent, #fff);
+    }
+    .news-content .content-full {
+      display: none;
+    }
+    .news-content .read-more, .news-content .read-less {
+      color: #007bff;
+      cursor: pointer;
+      text-decoration: underline;
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 0.9em;
+    }
+    .news-content .read-more:hover, .news-content .read-less:hover {
+      color: #0056b3;
+    }
+    .news-item img {
+      max-width: 100%;
+      height: auto;
+      margin-top: 10px;
+      border-radius: 4px;
+    }
+    /* Added for Admin News Form */
+    #news-form {
+      margin-bottom: 30px;
+      padding: 20px;
+      background-color: #f8f9fa;
+      border-radius: 5px;
+    }
+    #news-form input[type="text"], #news-form input[type="file"] {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    #news-form button {
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    #news-form button:hover {
+      background-color: #0056b3;
+    }
+    #news-form button:disabled {
+      background-color: #6c757d;
+      cursor: not-allowed;
+    }
+    #news-editor-container {
+      margin: 20px 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    #news-editor {
+      min-height: 200px;
+    } -->
+  </style>
 </head>
 <body>
   <header>
@@ -28,7 +216,23 @@
 
   <main class="container">
     <h2>NewsToday</h2>
-    
+
+    <!-- Admin News Creation Form -->
+    <% if (user && user.isAdmin) { %>
+      <section id="news-form">
+        <h3>Create News Post</h3>
+        <form id="news-create-form" action="/admin/news/post" method="POST" enctype="multipart/form-data">
+          <input type="text" id="news-title" name="title" placeholder="News Title" required>
+          <div id="news-editor-container">
+            <div id="news-editor"></div>
+          </div>
+          <input type="hidden" id="news-content" name="content">
+          <input type="file" id="news-image" name="image" accept="image/jpeg,image/png">
+          <button type="submit" id="submit-news">Post News</button>
+        </form>
+      </section>
+    <% } %>
+
     <div class="share-action-buttons">
       <div class="share-container">
         <div class="share-toggle" title="Share News">
@@ -93,15 +297,15 @@
           <div class="news-item book-news">
             <div class="news-content">
               <h4>New Book: <%= book.title %> - Author: <%= book.author %></h4>
-              <p class="visibility">
+              <!-- <p class="visibility">
                 <span class="visibility-badge visibility-<%= book.visibility %>">
                   <%= book.visibility.charAt(0).toUpperCase() + book.visibility.slice(1) %>
                 </span>
-              </p>
-              <% if (book.hasAccess){ %>
+              </p> -->
+              <% if (book.hasAccess) { %>
                 <a href="/view/<%= book._id %>" class="btn btn-primary">Read</a>
-              <% } else if (book.visibility === 'public') {%>
-                <a href= "/view/<%= book._id %>" class="btn btn-primary">Read</a>
+              <% } else if (book.visibility === 'public') { %>
+                <a href="/view/<%= book._id %>" class="btn btn-primary">Read</a>
               <% } else if (book.visibility === 'restricted') { %>
                 <% if (book.hasPendingRequest) { %>
                   <button class="btn btn-secondary disabled" disabled>Request Sent</button>
@@ -124,9 +328,12 @@
       <% } else { %>
         <% news.forEach(update => { %>
           <div class="news-item">
-            <div class="news-content">
+            <div class="news-content" id="news-<%= update._id %>">
               <h4><%= update.title %></h4>
-              <p><%= update.content %></p>
+              <div class="content-preview"><%- update.content %></div>
+              <div class="content-full"><%- update.content %></div>
+              <span class="read-more">Read More</span>
+              <span class="read-less" style="display: none;">Read Less</span>
               <% if (update.image) { %>
                 <img src="/news-image/<%= update._id %>" alt="<%= update.title %> image" class="news-image">
               <% } %>
@@ -161,8 +368,76 @@
     </div>
   </footer>
 
+  <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      // Initialize Quill for admin news form
+      if (document.getElementById('news-editor')) {
+        const quill = new Quill('#news-editor', {
+          theme: 'snow',
+          modules: {
+            toolbar: [
+              ['bold', 'italic', 'underline'],
+              [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+              ['link'],
+              ['clean']
+            ]
+          },
+          placeholder: 'Write your news content here...'
+        });
+
+        const newsForm = document.getElementById('news-create-form');
+        const submitButton = document.getElementById('submit-news');
+        newsForm.addEventListener('submit', (e) => {
+          document.getElementById('news-content').value = quill.root.innerHTML;
+          submitButton.disabled = true;
+          submitButton.textContent = 'Posting...';
+        });
+      }
+
+      // Read More/Read Less Functionality
+      document.querySelectorAll('.news-content').forEach(container => {
+        const preview = container.querySelector('.content-preview');
+        const full = container.querySelector('.content-full');
+        const readMore = container.querySelector('.read-more');
+        const readLess = container.querySelector('.read-less');
+
+        // Skip book news items (they don't have preview/full)
+        if (!preview || !full || !readMore || !readLess) {
+          console.log(`Skipping news-content ${container.id}: missing elements`);
+          return;
+        }
+
+        // Delay to ensure content is rendered
+        setTimeout(() => {
+          const lineHeight = parseFloat(getComputedStyle(preview).lineHeight) || 20;
+          const maxHeight = lineHeight * 5;
+          console.log(`News ${container.id}: lineHeight=${lineHeight}, maxHeight=${maxHeight}, scrollHeight=${preview.scrollHeight}`);
+
+          if (preview.scrollHeight > maxHeight + 5) {
+            readMore.style.display = 'inline-block';
+          } else {
+            readMore.style.display = 'none';
+          }
+        }, 100);
+
+        readMore.addEventListener('click', () => {
+          console.log(`Read More clicked for news ${container.id}`);
+          preview.style.display = 'none';
+          full.style.display = 'block';
+          readMore.style.display = 'none';
+          readLess.style.display = 'inline-block';
+        });
+
+        readLess.addEventListener('click', () => {
+          console.log(`Read Less clicked for news ${container.id}`);
+          preview.style.display = 'block';
+          full.style.display = 'none';
+          readMore.style.display = 'inline-block';
+          readLess.style.display = 'none';
+        });
+      });
+
       // Notes functionality
       const notesToggle = document.querySelector('.notes-toggle');
       const notesArea = document.querySelector('.notes-area');

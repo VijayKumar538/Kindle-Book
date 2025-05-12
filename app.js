@@ -75,7 +75,8 @@ app.use((req, res, next) => {
   if (req.method === 'POST' && ['/account/update-profile', '/account/update-password', '/feedback', '/account/delete', '/request-access'].includes(req.path)) {
     console.log(`Request to ${req.path}:`, {
       headers: req.headers,
-      body: req.body
+      body: req.body,
+      session: req.session
     });
     const originalJson = res.json;
     const originalRender = res.render;
@@ -803,7 +804,7 @@ app.get('/access-requests', isAuthenticated, async (req, res) => {
     })
       .populate('book', 'title author')
       .populate('requestedBy', 'username email');
-    res.render('access-requests', { requests: receivedRequests, user: req.user, note: req.note ? req.note.content : '' });
+    res.render('accessWELL-requests', { requests: receivedRequests, user: req.user, note: req.note ? req.note.content : '' });
   } catch (err) {
     console.error('Access requests error:', err);
     res.status(500).render('error', { message: 'Failed to load access requests', user: req.user, note: req.note ? req.note.content : '' });
@@ -1050,7 +1051,7 @@ app.post('/account/update-password', isAuthenticated, formUpload, async (req, re
       user: req.user,
       storageUsedMB: (req.user.storageUsed / (1024 * 1024)).toFixed(1),
       storageLimitMB: req.user.storageLimit / (1024 * 1024),
-      storagePercentage: ((req.user.storageUsed / req.user.storageLimit) * 100).toFixed(0),
+      storagePercentage: ((req.user.storageUsed / user.storageLimit) * 100).toFixed(0),
       error: errorMsg,
       success: null,
       note: req.note ? req.note.content : ''
@@ -1136,7 +1137,7 @@ app.post('/account/delete', isAuthenticated, formUpload, async (req, res) => {
       user: req.user,
       storageUsedMB: (req.user.storageUsed / (1024 * 1024)).toFixed(1),
       storageLimitMB: req.user.storageLimit / (1024 * 1024),
-      storagePercentage: ((req.user.storageUsed / req.user.storageLimit) * 100).toFixed(0),
+      storagePercentage: ((req.user.storageUsed / user.storageLimit) * 100).toFixed(0),
       error: errorMsg,
       success: null,
       note: req.note ? req.note.content : ''
@@ -1273,10 +1274,9 @@ app.get('/news', isAuthenticated, async (req, res) => {
     const newBooks = await Book.find({
       uploadDate: { $gte: today },
       visibility: { $in: ['public', 'restricted'] },
-      uploadedBy: { $ne: null } // Ensure uploadedBy exists
+      uploadedBy: { $ne: null }
     }).populate('uploadedBy', 'username').lean();
 
-    // Fetch pending requests for the user
     const pendingRequests = await Request.find({
       requestedBy: user._id,
       status: 'pending'
@@ -1289,7 +1289,6 @@ app.get('/news', isAuthenticated, async (req, res) => {
       .populate('postedBy', 'username')
       .lean();
 
-    // Add hasPendingRequest and hasAccess to each book
     const booksWithStatus = newBooks.map(book => {
       const hasAccess = (
         Array.isArray(book.accessList) && book.accessList.some(id => id.toString() === user._id.toString())
@@ -1365,8 +1364,26 @@ app.post('/admin/news/post', isAuthenticated, isAdmin, newsImageUpload.single('i
     if (!title || !content) {
       return res.redirect('/admin?error=Title and content are required');
     }
-    const sanitizedTitle = sanitizeHtml(title, { allowedTags: [], allowedAttributes: {} });
-    const sanitizedContent = sanitizeHtml(content, { allowedTags: [], allowedAttributes: {} });
+    const sanitizedTitle = sanitizeHtml(title, {
+      allowedTags: ['b', 'i', 'u', 'strong', 'em'],
+      allowedAttributes: {}
+    });
+    const sanitizedContent = sanitizeHtml(content, {
+      allowedTags: ['p', 'br', 'b', 'i', 'u', 'strong', 'em', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'a', 'span'],
+      allowedAttributes: {
+        'a': ['href', 'title'],
+        'span': ['style']
+      },
+      allowedStyles: {
+        'span': {
+          'color': [/^#(0-9a-fA-F]{6})$/],
+          'font-size': [/^\d+(px|em|rem)$/],
+          'font-weight': [/^bold$/],
+          'font-style': [/^italic$/],
+          'text-decoration': [/^underline$/]
+        }
+      }
+    });
 
     const newsData = {
       title: sanitizedTitle,
@@ -1393,6 +1410,8 @@ app.post('/request-access', isAuthenticated, async (req, res) => {
     const { bookId } = req.body;
     const user = req.user;
 
+    console.log(`Processing access request: bookId=${bookId}, userId=${user._id}`);
+
     if (!bookId) {
       return res.status(400).json({ success: false, message: 'Book ID is required' });
     }
@@ -1403,10 +1422,12 @@ app.post('/request-access', isAuthenticated, async (req, res) => {
 
     const book = await Book.findById(bookId).populate('uploadedBy', 'username profession');
     if (!book) {
+      console.error(`Book not found: bookId=${bookId}`);
       return res.status(404).json({ success: false, message: 'Book not found' });
     }
 
     if (book.visibility !== 'restricted' || book.uploadedBy.toString() === user._id || book.accessList.includes(user._id)) {
+      console.log(`Access not required: visibility=${book.visibility}, isOwner=${book.uploadedBy.toString() === user._id}, hasAccess=${book.accessList.includes(user._id)}`);
       return res.status(400).json({ success: false, message: 'Access already granted or not required' });
     }
 
@@ -1416,6 +1437,7 @@ app.post('/request-access', isAuthenticated, async (req, res) => {
       status: 'pending'
     });
     if (existingRequest) {
+      console.log(`Existing pending request found: requestId=${existingRequest._id}`);
       return res.status(400).json({ success: false, message: 'Access request already pending' });
     }
 
@@ -1426,8 +1448,8 @@ app.post('/request-access', isAuthenticated, async (req, res) => {
       status: 'pending'
     });
     await accessRequest.save();
+    console.log(`Access request created: requestId=${accessRequest._id}`);
 
-    // Send notification to book owner
     const notificationMessage = new Message({
       user: user._id,
       profession: book.uploadedBy.profession,
@@ -1442,9 +1464,11 @@ app.post('/request-access', isAuthenticated, async (req, res) => {
       requestId: accessRequest._id
     });
 
+    res.setHeader('Content-Type', 'application/json');
     return res.json({ success: true, message: 'Access request sent successfully' });
   } catch (err) {
     console.error('Request access error:', err);
+    res.setHeader('Content-Type', 'application/json');
     return res.status(500).json({ success: false, message: 'Server error' });
   }
 });
