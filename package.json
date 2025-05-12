@@ -4,7 +4,9 @@
   "description": "A Kindle clone application",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js",
+    "start": "node start.js",
+    "dev": "node app.js",
+    "keep-alive": "node scripts/keep-alive.js",
     "postinstall": "npm rebuild bcrypt --build-from-source"
   },
   "dependencies": {
@@ -23,7 +25,9 @@
     "passport-instagram": "^1.0.0",
     "passport-twitter": "^1.0.4",
     "sanitize-html": "^2.16.0",
-    "socket.io": "^4.8.0"
+    "socket.io": "^4.8.0",
+    "node-cron": "^3.0.2",
+    "axios": "^1.6.0"
   },
   "engines": {
     "node": ">=16.0.0"
