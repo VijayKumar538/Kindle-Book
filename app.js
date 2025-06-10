@@ -8,6 +8,9 @@ const path = require('path');
 const sanitizeHtml = require('sanitize-html');
 const http = require('http');
 const socketIo = require('socket.io');
+const passport = require('passport'); // Add Passport
+const GoogleStrategy = require('passport-google-oauth20').Strategy; // Add Google Strategy
+require('dotenv').config(); // Load environment variables
 
 const app = express();
 const server = http.createServer(app);
@@ -42,13 +45,71 @@ app.use(session({
   secret: 'your-secret-key',
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({ mongoUrl: 'mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qqrud.mongodb.net/MyLibrary1?retryWrites=true&w=majority&appName=MyLibrary' }),
+  store: MongoStore.create({ mongoUrl: 'mongodb+srv://bookhiversd:8D6pLujBM9rLVi8B@bookhive.7h76ryz.mongodb.net/BookHive?retryWrites=true&w=majority&appName=BookHive' }),
   cookie: { 
     maxAge: SESSION_TIMEOUT,
     secure: false, // Set to true if using HTTPS
     httpOnly: true
   }
 }));
+
+// Passport setup
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Passport Google Strategy
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: '/auth/google/callback'
+}, async (accessToken, refreshToken, profile, done) => {
+  try {
+    // Check if user exists by Google ID or email
+    let user = await User.findOne({ googleId: profile.id });
+    if (!user) {
+      user = await User.findOne({ email: profile.emails[0].value });
+      if (user) {
+        // If email exists, link Google ID to existing account
+        user.googleId = profile.id;
+        await user.save();
+      } else {
+        // Create new user if no match found
+        user = new User({
+          username: profile.displayName || `user${profile.id}`,
+          email: profile.emails[0].value,
+          googleId: profile.id,
+          profession: 'All-Professionals', // Default profession, prompt user to update later
+          password: 'google-auth-' + Math.random().toString(36).slice(2) // Dummy password
+        });
+        await user.save();
+        // Create a note for the new user
+        const newNote = new Note({
+          user: user._id,
+          content: ''
+        });
+        await newNote.save();
+      }
+    }
+    return done(null, user);
+  } catch (err) {
+    console.error('Google auth error:', err);
+    return done(err, null);
+  }
+}));
+
+// Serialize and deserialize user for session
+passport.serializeUser((user, done) => {
+  done(null, user._id);
+});
+
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await User.findById(id);
+    done(null, user);
+  } catch (err) {
+    done(err, null);
+  }
+});
 
 // Middleware to check session timeout
 app.use((req, res, next) => {
@@ -123,7 +184,7 @@ const fetchUserAndNote = async (req, res, next) => {
 app.use(fetchUserAndNote);
 
 // Connect to MongoDB
-mongoose.connect('mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qqrud.mongodb.net/MyLibrary1?retryWrites=true&w=majority&appName=MyLibrary', { 
+mongoose.connect('mongodb+srv://bookhiversd:8D6pLujBM9rLVi8B@bookhive.7h76ryz.mongodb.net/BookHive?retryWrites=true&w=majority&appName=BookHive', { 
   useNewUrlParser: true, 
   useUnifiedTopology: true 
 }).then(async () => {
@@ -136,7 +197,7 @@ mongoose.connect('mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qq
         username: 'admin',
         email: 'admin@bookhive.com',
         password: hashedPassword,
-        profession: 'software',
+        profession: 'All-Professionals',
         isAdmin: true
       });
       await adminUser.save();
@@ -159,10 +220,11 @@ const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  googleId: { type: String, unique: true, sparse: true }, // Add googleId field
   profession: { 
     type: String, 
     required: true, 
-    enum: ['software', 'agriculture', 'medicine', 'lawyer'] 
+    enum: ['All-Professionals'] 
   },
   createdAt: { type: Date, default: Date.now },
   storageUsed: { type: Number, default: 0 },
@@ -224,7 +286,7 @@ const feedbackSchema = new mongoose.Schema({
 
 const messageSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  profession: { type: String, required: true, enum: ['software', 'agriculture', 'medicine', 'lawyer'] },
+  profession: { type: String, required: true, enum: ['All-Professionals'] },
   content: { type: String, required: true },
   timestamp: { type: Date, default: Date.now }
 });
@@ -260,6 +322,24 @@ const upload = multer({
   },
   limits: { fileSize: 50 * 1024 * 1024 }
 });
+
+// Google OAuth Routes
+app.get('/auth/google', passport.authenticate('google', {
+  scope: ['profile', 'email']
+}));
+
+app.get('/auth/google/callback', 
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  (req, res) => {
+    req.session.userId = req.user._id;
+    req.session.lastActivity = Date.now();
+    if (req.user.isAdmin) {
+      res.redirect('/admin');
+    } else {
+      res.redirect('/library');
+    }
+  }
+);
 
 const newsImageUpload = multer({
   storage: multer.memoryStorage(),
@@ -366,7 +446,7 @@ app.post('/signup', async (req, res) => {
     if (!username || !email || !password || !profession) {
       return res.status(400).render('signup', { error: 'All fields are required', user: req.user, note: req.note ? req.note.content : '' });
     }
-    if (!['software', 'agriculture', 'medicine', 'lawyer'].includes(profession)) {
+    if (!['All-Professionals'].includes(profession)) {
       return res.status(400).render('signup', { error: 'Invalid profession selected', user: req.user, note: req.note ? req.note.content : '' });
     }
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
@@ -1333,7 +1413,7 @@ app.get('/news-image/:newsId', async (req, res) => {
 
 app.get('/admin', isAuthenticated, isAdmin, async (req, res) => {
   try {
-    const professions = ['software', 'agriculture', 'medicine', 'lawyer'];
+    const professions = ['All-Professionals'];
     const conversations = {};
 
     for (const profession of professions) {

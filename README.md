@@ -15,6 +15,7 @@ Kindle-Book/
 │   ├── my-requests.ejs
 │   ├── access-requests.ejs
 │   └── account.ejs
+│   └── news.ejs
 ├── public/
 │   ├── css/
 │   │   └── style.css
