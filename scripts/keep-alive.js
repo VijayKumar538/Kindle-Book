@@ -2,7 +2,7 @@ const cron = require('node-cron');
 const axios = require('axios');
 
 // URL of the endpoint to ping (set via environment variable or default to localhost for testing)
-const ENDPOINT_URL = process.env.APP_URL || 'https://mylibrary-1-4ri0.onrender.com';
+const ENDPOINT_URL = process.env.APP_URL || 'https://book-hive-kyta.onrender.com';
 
 // Function to ping the endpoint
 async function pingEndpoint() {
