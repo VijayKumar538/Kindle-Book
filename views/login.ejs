@@ -20,9 +20,9 @@
     <h2>Login to Your Account</h2>
     
     <% if (typeof error !== 'undefined') { %>
-      <!-- <div class="alert alert-error">
+      <div class="alert alert-error">
         <%= error %>
-      </div> -->
+      </div>
     <% } %>
     
     <form action="/login" method="POST">
@@ -39,6 +39,10 @@
       <button type="submit" class="btn btn-primary">Login</button>
     </form>
     
+    <div class="google-auth">
+      <a href="/auth/google" class="google-btn">Login with Google</a>
+    </div>
+    
     <p class="form-footer">
       Don't have an account? <a href="/signup">Sign Up</a>
     </p>
@@ -46,7 +50,7 @@
   
   <footer>
     <div class="container">
-      <p>&copy; 2025 BookHive. All rights reserved.</p>
+      <p>© 2025 BookHive. All rights reserved.</p>
     </div>
   </footer>
 </body>

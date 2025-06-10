@@ -1938,3 +1938,19 @@ footer p {
 .request-message.error {
   color: #dc3545;
 } */
+
+.google-btn {
+  display: block;
+  padding: 10px 20px;
+  background-color: #4285F4;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+  text-align: center;
+  margin-top: 10px;
+}
+.google-btn:hover {
+  background-color: #357ae8;
+}
