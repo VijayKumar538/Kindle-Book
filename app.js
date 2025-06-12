@@ -10,6 +10,9 @@ const http = require('http');
 const socketIo = require('socket.io');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const nodemailer = require('nodemailer');
+
+require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
@@ -305,6 +308,15 @@ const Note = mongoose.model('Note', noteSchema);
 const Feedback = mongoose.model('Feedback', feedbackSchema);
 const Message = mongoose.model('Message', messageSchema);
 const News = mongoose.model('News', newsSchema);
+
+// Configure nodemailer
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
 
 // Configure multer for file uploads (PDFs)
 const upload = multer({
@@ -1492,6 +1504,35 @@ app.post('/admin/news/post', isAuthenticated, isAdmin, newsImageUpload.single('i
 
     const news = new News(newsData);
     await news.save();
+
+    // Fetch all users' emails
+    const users = await User.find({ isAdmin: false }).select('email');
+    const emailList = users.map(user => user.email);
+
+    // Send individual emails to each user
+    try {
+      for (const email of emailList) {
+        const mailOptions = {
+          from: 'bookhive.rsd@gmail.com',
+          to: email,
+          subject: `New Update from BookHive: ${sanitizedTitle}`,
+          html: `
+            <h2>New Update from BookHive</h2>
+            <h3>${sanitizedTitle}</h3>
+            <div>${sanitizedContent}</div>
+            <p>Visit <a href="http://localhost:${PORT}/news">BookHive News</a> to read more.</p>
+            <p>Best regards,<br>BookHive Team</p>
+          `
+        };
+        await transporter.sendMail(mailOptions);
+        console.log(`Email notification sent successfully to: ${email}`);
+      }
+      console.log('All email notifications sent successfully');
+    } catch (emailErr) {
+      console.error('Error sending email notifications:', emailErr);
+      // Log error but don't fail the request
+    }
+
     res.redirect('/admin?success=News posted successfully');
   } catch (err) {
     console.error('News post error:', err);
