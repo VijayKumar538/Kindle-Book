@@ -8,6 +8,8 @@ const path = require('path');
 const sanitizeHtml = require('sanitize-html');
 const http = require('http');
 const socketIo = require('socket.io');
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
 const app = express();
 const server = http.createServer(app);
@@ -42,13 +44,69 @@ app.use(session({
   secret: 'your-secret-key',
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({ mongoUrl: 'mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qqrud.mongodb.net/MyLibrary1?retryWrites=true&w=majority&appName=MyLibrary' }),
+  store: MongoStore.create({ mongoUrl: 'mongodb://localhost:27017/' }),
   cookie: { 
     maxAge: SESSION_TIMEOUT,
     secure: false, // Set to true if using HTTPS
     httpOnly: true
   }
 }));
+
+// Passport setup
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Passport Google Strategy
+passport.use(new GoogleStrategy({
+  clientID: '660588293356-lhtl1spq2eocqeaj6agg4ub0qttoh044.apps.googleusercontent.com', // Replace with your Google Client ID
+  clientSecret: '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', // Replace with your Google Client Secret
+  callbackURL: '/auth/google/callback'
+}, async (accessToken, refreshToken, profile, done) => {
+  try {
+    let user = await User.findOne({ googleId: profile.id });
+    if (user) {
+      return done(null, user);
+    }
+    // Check if email already exists (for users who signed up manually)
+    user = await User.findOne({ email: profile.emails[0].value });
+    if (user) {
+      // Link Google account to existing user
+      user.googleId = profile.id;
+      await user.save();
+      return done(null, user);
+    }
+    // Create new user
+    user = new User({
+      googleId: profile.id,
+      username: profile.displayName.replace(/\s/g, '').toLowerCase(),
+      email: profile.emails[0].value,
+      profession: 'BookHive', // Default profession; prompt user to update later
+      password: await bcrypt.hash(Math.random().toString(36).slice(-8), 10) // Random password for Google users
+    });
+    await user.save();
+    const newNote = new Note({
+      user: user._id,
+      content: ''
+    });
+    await newNote.save();
+    done(null, user);
+  } catch (err) {
+    done(err, null);
+  }
+}));
+
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await User.findById(id);
+    done(null, user);
+  } catch (err) {
+    done(err, null);
+  }
+});
 
 // Middleware to check session timeout
 app.use((req, res, next) => {
@@ -123,7 +181,7 @@ const fetchUserAndNote = async (req, res, next) => {
 app.use(fetchUserAndNote);
 
 // Connect to MongoDB
-mongoose.connect('mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qqrud.mongodb.net/MyLibrary1?retryWrites=true&w=majority&appName=MyLibrary', { 
+mongoose.connect('mongodb://localhost:27017/', { 
   useNewUrlParser: true, 
   useUnifiedTopology: true 
 }).then(async () => {
@@ -136,7 +194,7 @@ mongoose.connect('mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qq
         username: 'admin',
         email: 'admin@bookhive.com',
         password: hashedPassword,
-        profession: 'software',
+        profession: 'BookHive',
         isAdmin: true
       });
       await adminUser.save();
@@ -158,11 +216,12 @@ mongoose.connect('mongodb+srv://vijaykumar1998kv:SehCGpSwG79J2ImU@mylibrary.u6qq
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
+  password: { type: String }, // Not required for Google users
+  googleId: { type: String, unique: true, sparse: true },
   profession: { 
     type: String, 
     required: true, 
-    enum: ['software', 'agriculture', 'medicine', 'lawyer'] 
+    enum: ['BookHive'] 
   },
   createdAt: { type: Date, default: Date.now },
   storageUsed: { type: Number, default: 0 },
@@ -224,7 +283,7 @@ const feedbackSchema = new mongoose.Schema({
 
 const messageSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  profession: { type: String, required: true, enum: ['software', 'agriculture', 'medicine', 'lawyer'] },
+  profession: { type: String, required: true, enum: ['BookHive'] },
   content: { type: String, required: true },
   timestamp: { type: Date, default: Date.now }
 });
@@ -282,7 +341,7 @@ function getFileTypeFromMime(mimeType) {
 
 // Authentication middleware
 const isAuthenticated = (req, res, next) => {
-  if (req.session.userId) {
+  if (req.session.userId || req.isAuthenticated()) {
     return next();
   }
   res.redirect('/login');
@@ -290,10 +349,10 @@ const isAuthenticated = (req, res, next) => {
 
 // Admin authentication middleware
 const isAdmin = async (req, res, next) => {
-  if (!req.session.userId) {
+  if (!req.session.userId && !req.isAuthenticated()) {
     return res.redirect('/login');
   }
-  const user = await User.findById(req.session.userId);
+  const user = req.user || await User.findById(req.session.userId);
   if (!user || !user.isAdmin) {
     return res.status(403).render('error', { message: 'Admin access required', user: req.user, note: req.note ? req.note.content : '' });
   }
@@ -351,13 +410,32 @@ io.on('connection', (socket) => {
   });
 });
 
+// Google Auth Routes
+app.get('/auth/google', passport.authenticate('google', {
+  scope: ['profile', 'email']
+}));
+
+app.get('/auth/google/callback', passport.authenticate('google', {
+  failureRedirect: '/login'
+}), (req, res) => {
+  req.session.userId = req.user._id;
+  req.session.lastActivity = Date.now();
+  if (req.user.isAdmin) {
+    res.redirect('/admin');
+  } else if (!req.user.profession) {
+    res.redirect('/account'); // Prompt to update profession
+  } else {
+    res.redirect('/library');
+  }
+});
+
 // Routes
 app.get('/', (req, res) => {
   res.render('index', { user: req.user, note: req.note ? req.note.content : '' });
 });
 
 app.get('/signup', (req, res) => {
-  res.render('signup', { user: req.user, note: req.note ? req.note.content : '' });
+  res.render('signup', { user: req.user, note: req.note ? req.note.content : '', error: null });
 });
 
 app.post('/signup', async (req, res) => {
@@ -366,7 +444,7 @@ app.post('/signup', async (req, res) => {
     if (!username || !email || !password || !profession) {
       return res.status(400).render('signup', { error: 'All fields are required', user: req.user, note: req.note ? req.note.content : '' });
     }
-    if (!['software', 'agriculture', 'medicine', 'lawyer'].includes(profession)) {
+    if (!['BookHive'].includes(profession)) {
       return res.status(400).render('signup', { error: 'Invalid profession selected', user: req.user, note: req.note ? req.note.content : '' });
     }
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
@@ -896,10 +974,10 @@ app.post('/account/update-profile', isAuthenticated, formUpload, async (req, res
     if (user.isAdmin) {
       return res.redirect('/admin');
     }
-    const { username, email, currentPassword } = req.body;
+    const { username, email, currentPassword, profession } = req.body;
     const isAjax = req.get('X-Requested-With') === 'XMLHttpRequest';
 
-    if (!username || !email || !currentPassword) {
+    if (!username || !email || (!user.googleId && !currentPassword) || !profession) {
       const errorMsg = 'All fields required';
       if (isAjax) {
         return res.status(400).json({ success: false, message: errorMsg });
@@ -915,7 +993,7 @@ app.post('/account/update-profile', isAuthenticated, formUpload, async (req, res
       });
     }
 
-    if (!await bcrypt.compare(currentPassword, user.password)) {
+    if (!user.googleId && !await bcrypt.compare(currentPassword, user.password)) {
       const errorMsg = 'Incorrect password';
       if (isAjax) {
         return res.status(400).json({ success: false, message: errorMsg });
@@ -953,6 +1031,7 @@ app.post('/account/update-profile', isAuthenticated, formUpload, async (req, res
 
     user.username = username;
     user.email = email;
+    user.profession = profession;
     await user.save();
 
     if (isAjax) {
@@ -969,7 +1048,7 @@ app.post('/account/update-profile', isAuthenticated, formUpload, async (req, res
       user: req.user,
       storageUsedMB: (req.user.storageUsed / (1024 * 1024)).toFixed(1),
       storageLimitMB: req.user.storageLimit / (1024 * 1024),
-      storagePercentage: ((req.user.storageUsed / req.user.storageLimit) * 100).toFixed(0),
+      storagePercentage: ((req.user.storageUsed / user.storageLimit) * 100).toFixed(0),
       error: errorMsg,
       success: null,
       note: req.note ? req.note.content : ''
@@ -982,6 +1061,21 @@ app.post('/account/update-password', isAuthenticated, formUpload, async (req, re
     const user = req.user;
     if (user.isAdmin) {
       return res.redirect('/admin');
+    }
+    if (user.googleId) {
+      const errorMsg = 'Google users cannot change passwords';
+      if (req.get('X-Requested-With') === 'XMLHttpRequest') {
+        return res.status(400).json({ success: false, message: errorMsg });
+      }
+      return res.status(400).render('account', {
+        user,
+        storageUsedMB: (user.storageUsed / (1024 * 1024)).toFixed(1),
+        storageLimitMB: user.storageLimit / (1024 * 1024),
+        storagePercentage: ((user.storageUsed / user.storageLimit) * 100).toFixed(0),
+        error: errorMsg,
+        success: null,
+        note: req.note ? req.note.content : ''
+      });
     }
     const { currentPassword, newPassword, confirmPassword } = req.body;
     const isAjax = req.get('X-Requested-With') === 'XMLHttpRequest';
@@ -1068,7 +1162,7 @@ app.post('/account/delete', isAuthenticated, formUpload, async (req, res) => {
     const { password, confirmDelete } = req.body;
     const isAjax = req.get('X-Requested-With') === 'XMLHttpRequest';
 
-    if (!password || !confirmDelete) {
+    if (!confirmDelete || (!user.googleId && !password)) {
       const errorMsg = 'Password and confirmation required';
       if (isAjax) {
         return res.status(400).json({ success: false, message: errorMsg });
@@ -1084,7 +1178,7 @@ app.post('/account/delete', isAuthenticated, formUpload, async (req, res) => {
       });
     }
 
-    if (!await bcrypt.compare(password, user.password)) {
+    if (!user.googleId && !await bcrypt.compare(password, user.password)) {
       const errorMsg = 'Incorrect password';
       if (isAjax) {
         return res.status(400).json({ success: false, message: errorMsg });
@@ -1333,7 +1427,7 @@ app.get('/news-image/:newsId', async (req, res) => {
 
 app.get('/admin', isAuthenticated, isAdmin, async (req, res) => {
   try {
-    const professions = ['software', 'agriculture', 'medicine', 'lawyer'];
+    const professions = ['BookHive'];
     const conversations = {};
 
     for (const profession of professions) {

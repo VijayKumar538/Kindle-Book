@@ -1,4 +1,3 @@
-<!-- views/login.ejs -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,6 +5,46 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - BookHive</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .google-btn-container {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    .or-divider {
+      text-align: center;
+      margin: 20px 0;
+      color: #666;
+      position: relative;
+    }
+    .or-divider::before,
+    .or-divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 45%;
+      height: 1px;
+      background: #ccc;
+    }
+    .or-divider::before {
+      left: 0;
+    }
+    .or-divider::after {
+      right: 0;
+    }
+    .btn {
+      display: inline-block;
+      padding: 0.5rem 0.6rem;
+      border-radius: 4px;
+      text-decoration: none;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.3s, transform 0.2s;
+      border: none;
+      font-size: 1.0rem;
+      background-color: dodgerblue;
+    }
+  </style>
 </head>
 <body>
   <header>
@@ -20,10 +59,19 @@
     <h2>Login to Your Account</h2>
     
     <% if (typeof error !== 'undefined') { %>
-      <!-- <div class="alert alert-error">
+      <div class="alert alert-error">
         <%= error %>
-      </div> -->
+      </div>
     <% } %>
+    
+    <div class="google-btn-container">
+      <a href="/auth/google" class="btn btn-google">
+        <img src="/images/GoogleLogo.jpg" alt="Google Logo" style="width: 20px; vertical-align: middle; margin-right: 10px;">
+        Sign In with Google
+      </a>
+    </div>
+    
+    <div class="or-divider">OR</div>
     
     <form action="/login" method="POST">
       <div class="form-group">
@@ -46,7 +94,7 @@
   
   <footer>
     <div class="container">
-      <p>&copy; 2025 BookHive. All rights reserved.</p>
+      <p>© 2025 BookHive. All rights reserved.</p>
     </div>
   </footer>
 </body>
