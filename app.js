@@ -59,7 +59,6 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Passport Google Strategy
 passport.use(new GoogleStrategy({
   clientID: '660588293356-lhtl1spq2eocqeaj6agg4ub0qttoh044.apps.googleusercontent.com', // Replace with your Google Client ID
   clientSecret: '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', // Replace with your Google Client Secret
@@ -92,6 +91,24 @@ passport.use(new GoogleStrategy({
       content: ''
     });
     await newNote.save();
+    // Send welcome email for new Google user
+    try {
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: user.email,
+        subject: 'Welcome to BookHive!',
+        html: `
+          <h2>Welcome to BookHive, ${user.username}!</h2>
+          <p>Thank you for joining our community. Explore, upload, and share your favorite books with BookHive.</p>
+          <p>Get started by visiting your <a href="http://localhost:${PORT}/library">Library</a>.</p>
+          <p>Best regards,<br>BookHive Team</p>
+        `
+      };
+      await transporter.sendMail(mailOptions);
+      console.log(`Welcome email sent to: ${user.email}`);
+    } catch (emailErr) {
+      console.error(`Error sending welcome email to ${user.email}:`, emailErr);
+    }
     done(null, user);
   } catch (err) {
     done(err, null);
@@ -476,6 +493,24 @@ app.post('/signup', async (req, res) => {
       content: ''
     });
     await newNote.save();
+    // Send welcome email
+    try {
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: newUser.email,
+        subject: 'Welcome to BookHive!',
+        html: `
+          <h2>Welcome to BookHive, ${newUser.username}!</h2>
+          <p>Thank you for joining our community. Explore, upload, and share your favorite books with BookHive.</p>
+          <p>Get started by visiting your <a href="http://localhost:${PORT}/library">Library</a>.</p>
+          <p>Best regards,<br>BookHive Team</p>
+        `
+      };
+      await transporter.sendMail(mailOptions);
+      console.log(`Welcome email sent to: ${newUser.email}`);
+    } catch (emailErr) {
+      console.error(`Error sending welcome email to ${newUser.email}:`, emailErr);
+    }
     res.redirect('/login');
   } catch (err) {
     console.error('Signup error:', err);
@@ -1555,14 +1590,14 @@ app.post('/request-access', isAuthenticated, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Admins cannot request access' });
     }
 
-    const book = await Book.findById(bookId).populate('uploadedBy', 'username profession');
+    const book = await Book.findById(bookId).populate('uploadedBy', 'username email profession');
     if (!book) {
       console.error(`Book not found: bookId=${bookId}`);
       return res.status(404).json({ success: false, message: 'Book not found' });
     }
 
     if (book.visibility !== 'restricted' || book.uploadedBy.toString() === user._id || book.accessList.includes(user._id)) {
-      console.log(`Access not required: visibility=${book.visibility}, isOwner=${book.uploadedBy.toString() === user._id}, hasAccess=${book.accessList.includes(user._id)}`);
+      console.log(`Access not required: visibility=${book.visibility}, isOwner=${book.uploadedBy.toString() === user._id}, hasAccess=${book.accessList.includes(user._id)})`);
       return res.status(400).json({ success: false, message: 'Access already granted or not required' });
     }
 
@@ -1583,6 +1618,26 @@ app.post('/request-access', isAuthenticated, async (req, res) => {
       status: 'pending'
     });
     await accessRequest.save();
+    // Send email to book owner
+    try {
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: book.uploadedBy.email,
+        subject: `Access Request for ${book.title}`,
+        html: `
+          <h2>Access Request for Restricted Book</h2>
+          <p>User <strong>${user.username}</strong> has requested access to your book "<strong>${book.title}</strong>".</p>
+          <p>Please review the request and grant access if appropriate.</p>
+          <p>Visit <a href="http://localhost:${PORT}/access-requests">Access Requests</a> to manage this request.</p>
+          <p>Best regards,<br>BookHive Team</p>
+        `
+      };
+      await transporter.sendMail(mailOptions);
+      console.log(`Access request email sent to: ${book.uploadedBy.email}`);
+    } catch (emailErr) {
+      console.error(`Error sending access request email to ${book.uploadedBy.email}:`, emailErr);
+    }
+
     console.log(`Access request created: requestId=${accessRequest._id}`);
 
     const notificationMessage = new Message({
